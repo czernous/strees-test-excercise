@@ -1,0 +1,1 @@
+C:\development\personal\StressTestApp\stresstestapp.client\obj\Debug\stresstestapp.client.esproj.CoreCompileInputs.cache

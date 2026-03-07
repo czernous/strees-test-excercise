@@ -1,0 +1,4 @@
+Loan_ID,Port_ID,OriginalLoanAmount,OutstandingAmount,CollateralValue,CreditRating
+1,101,100000,90000,110000,  AAA  
+2,102,200000,180000,220000,AA  
+3,103,150000,135000,165000,  A

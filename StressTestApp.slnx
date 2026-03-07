@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="stresstestapp.client/stresstestapp.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="StressTestApp.Server/StressTestApp.Server.csproj" />
+  <Project Path="StressTestApp.Tests/StressTestApp.Tests.csproj" />
+</Solution>
