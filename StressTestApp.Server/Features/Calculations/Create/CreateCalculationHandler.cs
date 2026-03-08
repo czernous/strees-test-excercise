@@ -10,7 +10,7 @@ namespace StressTestApp.Server.Features.Calculations.Create;
 
 public static class CreateCalculationHandler
 {
-    public static async Task<Results<Ok<CreateCalculationResponse>, ProblemHttpResult>> Handle(
+    public static async Task<Results<Created<CreateCalculationResponse>, ProblemHttpResult>> Handle(
         CreateCalculationRequest request,
         IMarketDataStore marketData,
         StressTestDbContext db,
@@ -136,7 +136,7 @@ public static class CreateCalculationHandler
                 calculation.TotalExpectedLoss
             );
 
-            return TypedResults.Ok(response);
+            return TypedResults.Created($"/calculations/{calculation.Id}", response);
         }
         catch (KeyNotFoundException ex)
         {
