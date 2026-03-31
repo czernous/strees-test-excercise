@@ -32,7 +32,7 @@ public class PortfolioCalculatorTests
 
         // Expected:
         // Scenario Collateral = 110,000 * 0.95 = 104,500
-        // RR = 104,500 / 100,000 = 1.045 (clamped to 1.0)
+        // RR = 104,500 / 90,000 = 1.161... (clamped to 1.0)
         // LGD = 0
         // EL = 0
 
@@ -65,22 +65,28 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "AAA"),
-            new(2, 1, 200_000, 180_000, 220_000, "AA"),
-            new(3, 1, 150_000, 140_000, 160_000, "A")
+            new(1, 1, 100_000, 100_000, 110_000, "AAA"), // Collateral 110k, Outstanding 100k
+            new(2, 1, 200_000, 200_000, 190_000, "AA"),  // Collateral 190k, Outstanding 200k - LOSS expected
+            new(3, 1, 150_000, 150_000, 140_000, "A")    // Collateral 140k, Outstanding 150k - LOSS expected
         }.AsReadOnly();
 
         var ratings = new List<Rating>
         {
-            new("AAA", 1),
-            new("AA", 2),
-            new("A", 3)
+            new("AAA", 1),   // 1% PD
+            new("AA", 2),    // 2% PD
+            new("A", 3)      // 3% PD
         }.AsReadOnly();
 
         var housePriceChanges = new Dictionary<string, decimal>
         {
-            ["US"] = -10m
+            ["US"] = -10m    // -10% house price drop
         };
+
+        // Expected calculations (with -10% scenario):
+        // Loan 1: ScenarioCV = 110k * 0.9 = 99k,  RR = 99k/100k = 0.99, LGD = 0.01, EL = 0.01 * 0.01 * 100k = 10
+        // Loan 2: ScenarioCV = 190k * 0.9 = 171k, RR = 171k/200k = 0.855, LGD = 0.145, EL = 0.02 * 0.145 * 200k = 580
+        // Loan 3: ScenarioCV = 140k * 0.9 = 126k, RR = 126k/150k = 0.84, LGD = 0.16, EL = 0.03 * 0.16 * 150k = 720
+        // Total EL = 10 + 580 + 720 = 1,310
 
         // Act
         var results = PortfolioCalculator.Calculate(
@@ -90,14 +96,15 @@ public class PortfolioCalculatorTests
         results.Should().HaveCount(1);
         var result = results[0];
         result.LoanCount.Should().Be(3);
-        result.TotalOutstandingAmount.Should().Be(410_000m); // 90k + 180k + 140k
-        result.TotalCollateralValue.Should().Be(490_000m); // 110k + 220k + 160k
-        
-        // Scenario collateral = 490,000 * 0.9 = 441,000
-        result.TotalScenarioCollateralValue.Should().Be(441_000m);
-        
-        // Each loan's EL needs to be calculated individually and summed
-        result.TotalExpectedLoss.Should().BeGreaterThan(0m);
+        result.TotalOutstandingAmount.Should().Be(450_000m); // 100k + 200k + 150k
+        result.TotalCollateralValue.Should().Be(440_000m); // 110k + 190k + 140k
+
+        // Scenario collateral = individual loans calculated separately, summed
+        // 99k + 171k + 126k = 396k
+        result.TotalScenarioCollateralValue.Should().Be(396_000m);
+
+        // Total Expected Loss should be approximately 1,310
+        result.TotalExpectedLoss.Should().Be(1_310m);
     }
 
     [Fact]

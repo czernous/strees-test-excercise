@@ -34,7 +34,6 @@ public static class PortfolioCalculator
             var (scenarioCollateral, expectedLoss) =
                 LoanCalculator.Compute(
                     loan.CollateralValue,
-                    loan.OriginalAmount,
                     loan.OutstandingAmount,
                     pctChange,
                     pd);

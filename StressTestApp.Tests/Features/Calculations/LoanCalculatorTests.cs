@@ -17,17 +17,17 @@ public class LoanCalculatorTests
 
         // Manual calculation:
         // Scenario Collateral = 100,000 * (1 + (-10/100)) = 90,000
-        // RR = 90,000 / 100,000 = 0.9
-        // LGD = 1 - 0.9 = 0.1
-        // EL = 0.05 * 0.1 * 90,000 = 450
+        // RR = 90,000 / 90,000 = 1.0 (collateral exactly covers outstanding amount)
+        // LGD = 1 - 1.0 = 0
+        // EL = 0.05 * 0 * 90,000 = 0
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ScenarioCollateralValue.Should().Be(90_000m);
-        result.ExpectedLoss.Should().Be(450m);
+        result.ExpectedLoss.Should().Be(0m);
     }
 
     [Fact]
@@ -41,13 +41,13 @@ public class LoanCalculatorTests
         decimal pd = 0.02m;
 
         // Scenario Collateral = 200,000 * (1 + (-5.12/100)) = 200,000 * 0.9488 = 189,760
-        // RR = 189,760 / 150,000 = 1.265... (clamped to 1.0)
+        // RR = 189,760 / 140,000 = 1.355... (clamped to 1.0)
         // LGD = 1 - 1.0 = 0
         // EL = 0.02 * 0 * 140,000 = 0
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ScenarioCollateralValue.Should().Be(189_760m);
@@ -65,13 +65,13 @@ public class LoanCalculatorTests
         decimal pd = 0.05m;
 
         // Scenario Collateral = 100,000 * 1.10 = 110,000
-        // RR = 110,000 / 100,000 = 1.1 (clamped to 1.0)
+        // RR = 110,000 / 90,000 = 1.222... (clamped to 1.0)
         // LGD = 0
         // EL = 0
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ScenarioCollateralValue.Should().Be(110_000m);
@@ -95,7 +95,7 @@ public class LoanCalculatorTests
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ScenarioCollateralValue.Should().Be(0m);
@@ -103,43 +103,45 @@ public class LoanCalculatorTests
     }
 
     [Fact]
-    public void Compute_ZeroOriginalLoanAmount_ReturnsZeroRecoveryRate()
-    {
-        // Arrange
-        int collateralValue = 100_000;
-        int originalLoanAmount = 0; // Edge case - should not crash
-        int outstandingAmount = 90_000;
-        decimal pctChange = -10m;
-        decimal pd = 0.05m;
-
-        // Should handle division by zero gracefully
-        // RR = 0 (special case in code)
-        // LGD = 1.0
-        // EL = 0.05 * 1.0 * 90,000 = 4,500
-
-        // Act
-        var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
-
-        // Assert
-        result.ExpectedLoss.Should().Be(4_500m);
-    }
-
-    [Fact]
-    public void Compute_ZeroOutstandingAmount_ProducesZeroExpectedLoss()
+    public void Compute_ZeroOutstandingAmount_HandlesGracefully()
     {
         // Arrange
         int collateralValue = 100_000;
         int originalLoanAmount = 100_000;
-        int outstandingAmount = 0;
-        decimal pctChange = -50m;
-        decimal pd = 0.1m;
+        int outstandingAmount = 0; // Edge case - should not crash
+        decimal pctChange = -10m;
+        decimal pd = 0.05m;
 
+        // Should handle division by zero gracefully
+        // When outstandingAmount = 0, RR calculation uses special case
         // EL = PD * LGD * 0 = 0
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
+
+        // Assert
+        result.ExpectedLoss.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Compute_ZeroOriginalLoanAmount_StillCalculatesCorrectly()
+    {
+        // Arrange - originalLoanAmount is now only used for context, not in calculations
+        int collateralValue = 100_000;
+        int originalLoanAmount = 0;
+        int outstandingAmount = 90_000;
+        decimal pctChange = -10m;
+        decimal pd = 0.05m;
+
+        // Scenario Collateral = 100,000 * 0.9 = 90,000
+        // RR = 90,000 / 90,000 = 1.0
+        // LGD = 0
+        // EL = 0
+
+        // Act
+        var result = LoanCalculator.Compute(
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ExpectedLoss.Should().Be(0m);
@@ -159,7 +161,7 @@ public class LoanCalculatorTests
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ExpectedLoss.Should().Be(0m);
@@ -182,7 +184,7 @@ public class LoanCalculatorTests
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ScenarioCollateralValue.Should().Be(0m);
@@ -199,13 +201,13 @@ public class LoanCalculatorTests
         decimal pctChange = 0m;
         decimal pd = 0.05m;
 
-        // RR = 200,000 / 100,000 = 2.0 (should be clamped to 1.0)
+        // RR = 200,000 / 90,000 = 2.222... (should be clamped to 1.0)
         // LGD = 0
         // EL = 0
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         result.ExpectedLoss.Should().Be(0m); // Fully covered
@@ -223,7 +225,7 @@ public class LoanCalculatorTests
     {
         // Act
         var result = LoanCalculator.Compute(
-            collateral, originalLoan, outstanding, pctChange, pd);
+            collateral, outstanding, pctChange, pd);
 
         // Assert - Invariants that should always hold
         result.ExpectedLoss.Should().BeGreaterThanOrEqualTo(0m, "Expected loss cannot be negative");
@@ -248,7 +250,7 @@ public class LoanCalculatorTests
 
         // Act
         var act = () => LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         act.Should().NotThrow("Should handle large values without overflow");
@@ -271,7 +273,7 @@ public class LoanCalculatorTests
 
         // Act
         var result = LoanCalculator.Compute(
-            collateralValue, originalLoanAmount, outstandingAmount, pctChange, pd);
+            collateralValue, outstandingAmount, pctChange, pd);
 
         // Assert
         // -5% means multiply by 0.95, so: 100,000 * 0.95 = 95,000

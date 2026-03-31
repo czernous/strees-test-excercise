@@ -40,7 +40,6 @@ public sealed class CsvLoader : ICsvDataLoader
         }
 
         var fileInfo = new FileInfo(filePath);
-        var estimatedRows = (int)(fileInfo.Length / EstimatedBytesPerRow);
         var initialCapacity = EstimateInitialCapacity(filePath);
 
         await using var fileStream = new FileStream(

@@ -9,21 +9,22 @@ public static class LoanCalculator
     /// pctChange is interpreted as percent delta (e.g. -5.12 means -5.12%):
     /// ScenarioCollateral = Collateral * (1 + pctChange/100).
     ///
-    /// RecoveryRate is clamped to [0..1] to avoid negative LGD/EL when collateral exceeds loan amount.
+    /// RecoveryRate = ScenarioCollateral / OutstandingAmount (clamped to [0..1]).
+    /// This ensures RR reflects what can be recovered from the current debt, not the original loan.
+    /// LGD = 1 - RR. EL = PD * LGD * OutstandingAmount.
     /// </remarks>
     public static LoanCalculationResult Compute(
-         int collateralValue,
-         int originalLoanAmount,
-         int outstandingAmount,
+         decimal collateralValue,
+         decimal outstandingAmount,
          decimal pctChange,
          decimal pd)
     {
         // pctChange like -5.12 means -5.12%
         var scenarioCollateral = collateralValue * (1m + (pctChange / 100m));
 
-        var rr = originalLoanAmount == 0
+        var rr = outstandingAmount == 0
             ? 0m
-            : scenarioCollateral / originalLoanAmount;
+            : scenarioCollateral / outstandingAmount;
 
         rr = Clamp(rr, 0m, 1m);
 
