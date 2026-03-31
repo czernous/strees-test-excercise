@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using StressTestApp.Server.Data;
+using StressTestApp.Server.Core.Database;
 
 namespace StressTestApp.Server.Features.Calculations.List;
 
 public static class ListCalculationsHandler
 {
     public static async Task<IResult> Handle(
-        StressTestDbContext db,
+        IStressTestDbContext db,
         CancellationToken ct)
     {
         // SQLite doesn't support ordering by DateTimeOffset in SQL

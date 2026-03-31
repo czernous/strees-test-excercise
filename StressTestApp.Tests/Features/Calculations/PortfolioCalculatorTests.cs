@@ -1,6 +1,6 @@
 using FluentAssertions;
-using StressTestApp.Server.Data.Models;
 using StressTestApp.Server.Features.Calculations.Compute;
+using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Tests.Features.Calculations;
 
@@ -17,7 +17,7 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "AAA")
+            new(1, 1, 100_000m, 90_000m, 110_000m, "AAA")
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -65,9 +65,9 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 100_000, 110_000, "AAA"), // Collateral 110k, Outstanding 100k
-            new(2, 1, 200_000, 200_000, 190_000, "AA"),  // Collateral 190k, Outstanding 200k - LOSS expected
-            new(3, 1, 150_000, 150_000, 140_000, "A")    // Collateral 140k, Outstanding 150k - LOSS expected
+            new(1, 1, 100_000m, 100_000m, 110_000m, "AAA"), // Collateral 110k, Outstanding 100k
+            new(2, 1, 200_000m, 200_000m, 190_000m, "AA"),  // Collateral 190k, Outstanding 200k - LOSS expected
+            new(3, 1, 150_000m, 150_000m, 140_000m, "A")    // Collateral 140k, Outstanding 150k - LOSS expected
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -119,10 +119,10 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "AAA"), // UK
-            new(2, 1, 150_000, 140_000, 160_000, "AA"), // UK
-            new(3, 2, 200_000, 180_000, 220_000, "A"),  // US
-            new(4, 2, 250_000, 230_000, 270_000, "BBB") // US
+            new(1, 1, 100_000m, 90_000m, 110_000m, "AAA"), // UK
+            new(2, 1, 150_000m, 140_000m, 160_000m, "AA"), // UK
+            new(3, 2, 200_000m, 180_000m, 220_000m, "A"),  // US
+            new(4, 2, 250_000m, 230_000m, 270_000m, "BBB") // US
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -166,7 +166,7 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "AAA")
+            new(1, 1, 100_000m, 90_000m, 110_000m, "AAA")
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -233,9 +233,9 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 3, 100_000, 90_000, 110_000, "AAA"),
-            new(2, 1, 100_000, 90_000, 110_000, "AAA"),
-            new(3, 2, 100_000, 90_000, 110_000, "AAA")
+            new(1, 3, 100_000m, 90_000m, 110_000m, "AAA"),
+            new(2, 1, 100_000m, 90_000m, 110_000m, "AAA"),
+            new(3, 2, 100_000m, 90_000m, 110_000m, "AAA")
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -272,8 +272,8 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 50_000, "AAA"), // Low PD
-            new(2, 1, 100_000, 90_000, 50_000, "CCC")  // High PD
+            new(1, 1, 100_000m, 90_000m, 50_000m, "AAA"), // Low PD
+            new(2, 1, 100_000m, 90_000m, 50_000m, "CCC")  // High PD
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -310,8 +310,8 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "aaa"), // Lowercase
-            new(2, 1, 100_000, 90_000, 110_000, "AAA")  // Uppercase
+            new(1, 1, 100_000m, 90_000m, 110_000m, "aaa"), // Lowercase
+            new(2, 1, 100_000m, 90_000m, 110_000m, "AAA")  // Uppercase
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -349,7 +349,7 @@ public class PortfolioCalculatorTests
 
         var loans = new List<Loan>
         {
-            new(1, 1, 100_000, 90_000, 110_000, "AAA")
+            new(1, 1, 100_000m, 90_000m, 110_000m, "AAA")
         }.AsReadOnly();
 
         var ratings = new List<Rating>
@@ -369,11 +369,51 @@ public class PortfolioCalculatorTests
         // Assert
         results.Should().HaveCount(1);
         var result = results[0];
-        
+
         // Invariants
         result.TotalExpectedLoss.Should().BeGreaterThanOrEqualTo(0m);
         result.TotalScenarioCollateralValue.Should().BeGreaterThanOrEqualTo(0m);
         result.TotalOutstandingAmount.Should().Be(90_000m);
         result.TotalCollateralValue.Should().Be(110_000m);
+    }
+
+    [Fact]
+    public void Calculate_WithUnknownRating_SkipsLoanGracefully()
+    {
+        // Arrange
+        var portfolios = new List<Portfolio>
+        {
+            new("1", "Portfolio A", "GB", "GBP")
+        }.AsReadOnly();
+
+        var loans = new List<Loan>
+        {
+            new(1, 1, 100_000m, 90_000m, 110_000m, "AAA"),     // Known rating
+            new(2, 1, 50_000m, 45_000m, 55_000m, "UNKNOWN")    // Unknown rating - should be skipped
+        }.AsReadOnly();
+
+        var ratings = new List<Rating>
+        {
+            new("AAA", 1) // Only AAA is known
+        }.AsReadOnly();
+
+        var housePriceChanges = new Dictionary<string, decimal>
+        {
+            ["GB"] = -5m
+        };
+
+        // Act
+        var results = PortfolioCalculator.Calculate(
+            loans, portfolios, ratings, housePriceChanges);
+
+        // Assert
+        results.Should().HaveCount(1);
+        var result = results[0];
+
+        // Only the AAA loan should be included
+        result.LoanCount.Should().Be(1, "Loan with unknown rating should be skipped");
+        result.TotalOutstandingAmount.Should().Be(90_000m, "Only AAA loan outstanding");
+        result.TotalCollateralValue.Should().Be(110_000m, "Only AAA loan collateral");
+        result.TotalScenarioCollateralValue.Should().Be(104_500m, "Only AAA loan scenario collateral");
     }
 }

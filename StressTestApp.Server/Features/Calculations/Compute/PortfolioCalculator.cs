@@ -1,4 +1,4 @@
-﻿using StressTestApp.Server.Data.Models;
+﻿using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Server.Features.Calculations.Compute;
 
@@ -29,7 +29,11 @@ public static class PortfolioCalculator
 
             housePriceChanges.TryGetValue(portfolio.Country, out var pctChange);
 
-            var pd = pdByRating[loan.CreditRating];
+            // Handle missing ratings gracefully - skip loan if rating unknown
+            if (!pdByRating.TryGetValue(loan.CreditRating, out var pd))
+            {
+                continue; // Skip loans with unknown ratings
+            }
 
             var (scenarioCollateral, expectedLoss) =
                 LoanCalculator.Compute(

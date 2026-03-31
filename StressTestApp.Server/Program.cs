@@ -1,26 +1,31 @@
 using Carter;
 using Microsoft.EntityFrameworkCore;
-using StressTestApp.Server.Data;
-using StressTestApp.Server.Infrastructure.CsvLoader;
-using StressTestApp.Server.Infrastructure.CsvLoader.Configurations;
-using StressTestApp.Server.Infrastructure.CsvLoader.Interfaces;
-using StressTestApp.Server.Persistence.MarketDataStore;
-using StressTestApp.Server.Persistence.MarketDataStore.Interfaces;
+using StressTestApp.Server.Core.Database;
+using StressTestApp.Server.Core.IO.Csv.Parser;
+using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
+using StressTestApp.Server.Core.IO.FileLoader;
+using StressTestApp.Server.Core.Storage.InMemoryStore;
+using StressTestApp.Server.Core.Storage.MarketDataStore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var dbFolder = Path.Combine("Data", "Db");
+var appDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+var dbFolder = Path.Combine(appDir, "Data", "Db");
 Directory.CreateDirectory(dbFolder);
 var dbPath = Path.Combine(dbFolder, "stresstest.db");
 
 builder.Services.AddDbContext<StressTestDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
+builder.Services.AddScoped<IStressTestDbContext>(provider =>
+    provider.GetRequiredService<StressTestDbContext>());
+
+builder.Services.AddSingleton<IFileLoader, FileLoader>();
 
 builder.Services.AddOptionsWithValidateOnStart<CsvPaths>();
 builder.Services.ConfigureOptions<CsvPathsSetup>();
 
-builder.Services.AddSingleton<ICsvDataLoader, CsvLoader>();
-builder.Services.AddSingleton<IMarketDataStore, MarketDataStore>();
+builder.Services.AddSingleton<ICsvParser, CsvParser>();
+builder.Services.AddSingleton<IInMemoryStore, MarketDataStore>();
 
 builder.Services.AddCarter();
 builder.Services.AddOpenApi();

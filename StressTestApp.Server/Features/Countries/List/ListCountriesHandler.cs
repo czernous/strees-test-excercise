@@ -1,18 +1,19 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
-using StressTestApp.Server.Persistence.MarketDataStore.Interfaces;
+using StressTestApp.Server.Core.Storage.InMemoryStore;
+using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Server.Features.Countries.List;
 
 public static class ListCountriesHandler
 {
     public static async Task<Results<Ok<ListCountriesResponse>, NotFound, ProblemHttpResult>> Handle(
-        IMarketDataStore store,
+        IInMemoryStore store,
         CancellationToken ct
     )
     {
         try
         {
-            var portfolios = await store.GetPortfoliosAsync(ct);
+            var portfolios = await store.GetOrCacheAsync<Portfolio>(ct);
             var countries = portfolios
                 .Select(p => p.Country)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

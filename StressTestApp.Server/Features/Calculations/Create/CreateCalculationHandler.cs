@@ -1,10 +1,11 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using StressTestApp.Server.Data;
-using StressTestApp.Server.Domain.Entities;
+using StressTestApp.Server.Core.Database;
+using StressTestApp.Server.Core.Database.Entities;
+using StressTestApp.Server.Core.Storage.InMemoryStore;
 using StressTestApp.Server.Features.Calculations.Compute;
-using StressTestApp.Server.Persistence.MarketDataStore.Interfaces;
+using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Server.Features.Calculations.Create;
 
@@ -12,8 +13,8 @@ public static class CreateCalculationHandler
 {
     public static async Task<Results<Created<CreateCalculationResponse>, ProblemHttpResult>> Handle(
         CreateCalculationRequest request,
-        IMarketDataStore marketData,
-        StressTestDbContext db,
+        IInMemoryStore marketData,
+        IStressTestDbContext db,
         CancellationToken ct)
     {
         try
@@ -44,9 +45,9 @@ public static class CreateCalculationHandler
 
             var sw = Stopwatch.StartNew();
 
-            var portfolios = await marketData.GetPortfoliosAsync(ct);
-            var loans = await marketData.GetLoansAsync(ct);
-            var ratings = await marketData.GetRatingsAsync(ct);
+            var portfolios = await marketData.GetOrCacheAsync<Portfolio>(ct);
+            var loans = await marketData.GetOrCacheAsync<Loan>(ct);
+            var ratings = await marketData.GetOrCacheAsync<Rating>(ct);
 
             if (portfolios.Count == 0 || loans.Count == 0 || ratings.Count == 0)
             {

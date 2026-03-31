@@ -9,9 +9,9 @@ public class LoanCalculatorTests
     public void Compute_SimpleCase_CalculatesCorrectly()
     {
         // Arrange - Simple numbers we can verify by hand
-        int collateralValue = 100_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -10m; // -10%
         decimal pd = 0.05m; // 5%
 
@@ -34,9 +34,9 @@ public class LoanCalculatorTests
     public void Compute_NegativeHousePriceChange_DecreasesCollateralValue()
     {
         // Arrange
-        int collateralValue = 200_000;
-        int originalLoanAmount = 150_000;
-        int outstandingAmount = 140_000;
+        decimal collateralValue = 200_000m;
+        decimal originalLoanAmount = 150_000m;
+        decimal outstandingAmount = 140_000m;
         decimal pctChange = -5.12m;
         decimal pd = 0.02m;
 
@@ -58,9 +58,9 @@ public class LoanCalculatorTests
     public void Compute_PositiveHousePriceChange_IncreasesCollateralValue()
     {
         // Arrange
-        int collateralValue = 100_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = 10m; // +10%
         decimal pd = 0.05m;
 
@@ -82,9 +82,9 @@ public class LoanCalculatorTests
     public void Compute_ZeroCollateral_ProducesMaximumLoss()
     {
         // Arrange
-        int collateralValue = 0;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 0m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -10m;
         decimal pd = 0.05m;
 
@@ -106,9 +106,9 @@ public class LoanCalculatorTests
     public void Compute_ZeroOutstandingAmount_HandlesGracefully()
     {
         // Arrange
-        int collateralValue = 100_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 0; // Edge case - should not crash
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 0m; // Edge case - should not crash
         decimal pctChange = -10m;
         decimal pd = 0.05m;
 
@@ -128,9 +128,9 @@ public class LoanCalculatorTests
     public void Compute_ZeroOriginalLoanAmount_StillCalculatesCorrectly()
     {
         // Arrange - originalLoanAmount is now only used for context, not in calculations
-        int collateralValue = 100_000;
-        int originalLoanAmount = 0;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 0m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -10m;
         decimal pd = 0.05m;
 
@@ -151,9 +151,9 @@ public class LoanCalculatorTests
     public void Compute_ZeroProbabilityOfDefault_ProducesZeroExpectedLoss()
     {
         // Arrange
-        int collateralValue = 50_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 50_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -20m;
         decimal pd = 0m; // AAA rating, zero default probability
 
@@ -171,9 +171,9 @@ public class LoanCalculatorTests
     public void Compute_Minus100PercentChange_ProducesZeroCollateral()
     {
         // Arrange
-        int collateralValue = 100_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -100m; // Complete market collapse
         decimal pd = 0.05m;
 
@@ -195,9 +195,9 @@ public class LoanCalculatorTests
     public void Compute_CollateralExceedsLoan_ClampsRecoveryRateToOne()
     {
         // Arrange
-        int collateralValue = 200_000; // Double the loan value
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 200_000m; // Double the loan value
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = 0m;
         decimal pd = 0.05m;
 
@@ -221,7 +221,7 @@ public class LoanCalculatorTests
     [InlineData(-5.5, 80_000, 90_000, 85_000, 0.04)]
     [InlineData(-5.68, 300_000, 280_000, 275_000, 0.06)]
     public void Compute_ExampleScenarios_ProducesValidResults(
-        decimal pctChange, int collateral, int originalLoan, int outstanding, decimal pd)
+        decimal pctChange, decimal collateral, decimal originalLoan, decimal outstanding, decimal pd)
     {
         // Act
         var result = LoanCalculator.Compute(
@@ -240,9 +240,9 @@ public class LoanCalculatorTests
     public void Compute_LargeValues_HandlesWithoutOverflow()
     {
         // Arrange - Test with very large but realistic values
-        int collateralValue = 10_000_000; // $10M
-        int originalLoanAmount = 8_000_000; // $8M
-        int outstandingAmount = 7_500_000; // $7.5M
+        decimal collateralValue = 10_000_000m; // $10M
+        decimal originalLoanAmount = 8_000_000m; // $8M
+        decimal outstandingAmount = 7_500_000m; // $7.5M
         decimal pctChange = -30m; // Severe crash to ensure losses
         decimal pd = 0.08m;
 
@@ -265,9 +265,9 @@ public class LoanCalculatorTests
         // The formula should be: Collateral * (1 + pctChange/100)
         // NOT: Collateral * (1 + pctChange)
         
-        int collateralValue = 100_000;
-        int originalLoanAmount = 100_000;
-        int outstandingAmount = 90_000;
+        decimal collateralValue = 100_000m;
+        decimal originalLoanAmount = 100_000m;
+        decimal outstandingAmount = 90_000m;
         decimal pctChange = -5m; // -5% (not -0.05)
         decimal pd = 0.05m;
 

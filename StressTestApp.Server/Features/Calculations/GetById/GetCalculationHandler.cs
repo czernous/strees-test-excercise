@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using StressTestApp.Server.Data;
-using StressTestApp.Server.Features.Calculations.Compute;
-using StressTestApp.Server.Features.Calculations.Get;
+using StressTestApp.Server.Core.Database;
+using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Server.Features.Calculations.GetById;
 
@@ -10,7 +9,7 @@ public static class GetCalculationHandler
 {
     public static async Task<Results<Ok<GetCalculationResponse>, NotFound>> Handle(
         Guid id,
-        StressTestDbContext db,
+        IStressTestDbContext db,
         CancellationToken ct)
     {
         // Fetch data first, then build dictionaries in memory
