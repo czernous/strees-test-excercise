@@ -20,18 +20,24 @@ public class FileLoader : IFileLoader
     /// <remarks>
     /// The caller is responsible for disposing the returned memory owner after use.
     /// </remarks>
-    public async ValueTask<IMemoryOwner<byte>> LoadAsync(string path, CancellationToken ct = default)
+    public async ValueTask<(IMemoryOwner<byte>, int)> LoadAsync(string path, int bufferSize = 4096, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path, "File path is required");
+
         var fileInfo = new FileInfo(path);
+        if (!fileInfo.Exists)
+        {
+            throw new FileNotFoundException("File not found.", path);
+        }
         // Borrow a buffer from the pool based on file size
         var owner = MemoryPool<byte>.Shared.Rent((int)fileInfo.Length);
 
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: true);
 
         // Read directly into the pooled memory
         int bytesRead = await fs.ReadAsync(owner.Memory, ct);
 
-        // Return the owner so the caller can dispose it (returning it to the pool)
-        return owner;
+        // Return the owner and the number of bytes read so the caller can dispose it (returning it to the pool)
+        return (owner, bytesRead);
     }
 }

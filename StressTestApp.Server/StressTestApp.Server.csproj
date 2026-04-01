@@ -38,7 +38,6 @@
 
   <ItemGroup>
     <Folder Include="Core\IO\Csv\Parser\Exceptions\" />
-    <Folder Include="Infrastructure\ExceptionHandling\" />
   </ItemGroup>
 
 </Project>

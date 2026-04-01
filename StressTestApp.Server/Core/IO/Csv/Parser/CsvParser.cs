@@ -37,7 +37,10 @@ public sealed partial class CsvParser : ICsvParser
             IncludePrivateMembers = true,
             ShouldUseConstructorParameters = _ => true,
             ShouldSkipRecord = args =>
-                 args.Row.Parser.Record?.Any(string.IsNullOrWhiteSpace) == true,
+                {
+                    var record = args.Row.Parser.Record;
+                    return record is null or { Length: 0 } || record.All(string.IsNullOrWhiteSpace);
+                },
             ReadingExceptionOccurred = static args =>
             {
                 // Only skip completely blank rows - let other exceptions propagate
@@ -79,18 +82,19 @@ public sealed partial class CsvParser : ICsvParser
     {
         ArgumentNullException.ThrowIfNull(_fileLoader);
 
-        var memoryOwner = await _fileLoader.LoadAsync(filePath, cancellationToken);
+        var (memoryOwner, bytesRead) = await _fileLoader.LoadAsync(filePath, FileStreamBufferSize, cancellationToken);
 
         using (memoryOwner)
         {
             // Try to get the underlying array to avoid .ToArray() copy
             if (!MemoryMarshal.TryGetArray(memoryOwner.Memory, out ArraySegment<byte> segment))
             {
-                throw new InvalidOperationException("Failed to get underlying array from MemoryPool.");
+                throw new InvalidOperationException("MemoryPool must be array-backed for this implementation.");
             }
-
             // Use the segment (array + offset + count) to wrap the memory without copying
-            using var stream = new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false);
+            var slicedSegment = new ArraySegment<byte>(segment.Array!, segment.Offset, bytesRead);
+
+            using var stream = new MemoryStream(slicedSegment.Array!, slicedSegment.Offset, slicedSegment.Count, writable: false);
             using var reader = new StreamReader(stream, Encoding.UTF8, true, FileStreamBufferSize);
             using var csv = new CsvReader(reader, _csvConfig);
 
