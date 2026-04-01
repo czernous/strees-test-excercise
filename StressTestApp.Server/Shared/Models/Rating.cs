@@ -1,7 +1,11 @@
-﻿namespace StressTestApp.Server.Shared.Models
+﻿using StressTestApp.Server.Shared.Contracts;
+
+namespace StressTestApp.Server.Shared.Models;
+
+public record struct Rating(
+    string RatingValue,
+    int ProbabilityOfDefault
+) : IIntegrityContract
 {
-    public record Rating(
-        string RatingValue,
-        int ProbabilityOfDefault
-    );
+    public readonly bool IsValid => !string.IsNullOrWhiteSpace(RatingValue);
 }

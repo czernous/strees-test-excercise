@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
@@ -14,7 +15,7 @@ public class CsvParserTests
     public CsvParserTests()
     {
         var fileLoader = new FileLoader();
-        _csvParser = new CsvParser(fileLoader);
+        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -153,7 +154,7 @@ public class CsvParserTests
 
         // Assert
         await act.Should().ThrowAsync<FileNotFoundException>()
-            .WithMessage($"CSV file not found: {filePath}");
+            .WithMessage("*nonexistent.csv*");
     }
 
     [Fact]
@@ -186,5 +187,54 @@ public class CsvParserTests
         result1.Should().HaveCount(3);
         result2.Should().HaveCount(3);
         result1.Should().BeEquivalentTo(result2);
+    }
+
+    [Fact]
+    public async Task LoadCsvAsync_WithEmptyRequiredFields_SkipsInvalidRows()
+    {
+        // Arrange - Create CSV with some empty fields
+        var filePath = Path.Combine(_testDataPath, "portfolios_with_empty_fields.csv");
+        var csvContent = """
+            Port_ID,Port_Name,Port_Country,Port_CCY
+            1,Valid Portfolio,US,USD
+            2,Missing Country,,EUR
+            3,,GB,GBP
+            4,Another Valid,FR,EUR
+            """;
+        await File.WriteAllTextAsync(filePath, csvContent);
+
+        // Act
+        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+
+        // Assert - Parser skips rows with ANY empty field
+        result.Should().HaveCount(2, "Only rows without empty fields should be loaded");
+        result.Should().Contain(p => p.Id == "1" && p.Country == "US");
+        result.Should().Contain(p => p.Id == "4" && p.Country == "FR");
+        result.Should().AllSatisfy(p => p.IsValid.Should().BeTrue());
+    }
+
+    [Fact]
+    public async Task LoadCsvAsync_WithBlankRows_SkipsEmptyLines()
+    {
+        // Arrange - Create CSV with completely blank rows
+        var filePath = Path.Combine(_testDataPath, "portfolios_with_blank_rows.csv");
+        var csvContent = """
+            Port_ID,Port_Name,Port_Country,Port_CCY
+            1,Portfolio 1,US,USD
+
+            2,Portfolio 2,GB,GBP
+
+            3,Portfolio 3,FR,EUR
+            """;
+        await File.WriteAllTextAsync(filePath, csvContent);
+
+        // Act
+        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+
+        // Assert - Only valid rows loaded, blank rows skipped
+        result.Should().HaveCount(3);
+        result[0].Id.Should().Be("1");
+        result[1].Id.Should().Be("2");
+        result[2].Id.Should().Be("3");
     }
 }

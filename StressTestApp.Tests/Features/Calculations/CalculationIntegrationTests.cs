@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
@@ -15,7 +16,7 @@ public class CalculationIntegrationTests
     public CalculationIntegrationTests()
     {
         var fileLoader = new FileLoader();
-        _csvParser = new CsvParser(fileLoader);
+        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -29,7 +30,7 @@ public class CalculationIntegrationTests
 
         var portfolios = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath);
         var loans = await _csvParser.ParseAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath);
+        var ratings =await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath);
 
         var housePriceChanges = new Dictionary<string, decimal>
         {

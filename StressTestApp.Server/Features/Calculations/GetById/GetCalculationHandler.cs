@@ -10,51 +10,32 @@ public static class GetCalculationHandler
     public static async Task<Results<Ok<GetCalculationResponse>, NotFound>> Handle(
         Guid id,
         IStressTestDbContext db,
+        ILogger<GetCalculationResponse> logger,
         CancellationToken ct)
     {
-        // Fetch data first, then build dictionaries in memory
-        // SQLite/EF Core can't translate ToDictionary in projections
-        var result = await db.Calculations
+        // Include only what's necessary.
+        var calculation = await db.Calculations
             .AsNoTracking()
-            .Where(c => c.Id == id)
-            .Select(c => new
-            {
-                c.Id,
-                c.CreatedAtUtc,
-                c.DurationMs,
-                c.PortfolioCount,
-                c.LoanCount,
-                c.TotalExpectedLoss,
-                Inputs = c.Inputs.Select(i => new { i.CountryCode, i.HousePriceChange }).ToList(),
-                Results = c.Results.Select(r => new
-                {
-                    r.PortfolioId,
-                    r.PortfolioName,
-                    r.Country,
-                    r.Currency,
-                    r.TotalOutstandingAmount,
-                    r.TotalCollateralValue,
-                    r.TotalScenarioCollateralValue,
-                    r.TotalExpectedLoss,
-                    r.LoanCount
-                }).ToList()
-            })
-            .FirstOrDefaultAsync(ct);
+            .Include(c => c.Inputs)
+            .Include(c => c.Results)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
 
-        if (result is null)
+        if (calculation is null)
         {
+            logger.LogNotFound(id);
             return TypedResults.NotFound();
         }
 
+        // 2. Mapping (Push this logic into a Mapper or the Entity itself)
         var response = new GetCalculationResponse(
-            result.Id,
-            result.CreatedAtUtc,
-            result.DurationMs,
-            result.PortfolioCount,
-            result.LoanCount,
-            result.TotalExpectedLoss,
-            result.Inputs.ToDictionary(i => i.CountryCode, i => i.HousePriceChange),
-            result.Results.Select(r => new PortfolioCalculationResult(
+            calculation.Id,
+            calculation.CreatedAtUtc,
+            calculation.DurationMs,
+            calculation.PortfolioCount,
+            calculation.LoanCount,
+            calculation.TotalExpectedLoss,
+            calculation.GetHousePriceChanges(),
+            [.. calculation.Results.Select(r => new PortfolioCalculationResult(
                 r.PortfolioId,
                 r.PortfolioName,
                 r.Country,
@@ -64,7 +45,7 @@ public static class GetCalculationHandler
                 r.TotalScenarioCollateralValue,
                 r.TotalExpectedLoss,
                 r.LoanCount
-            )).ToList()
+            ))]
         );
 
         return TypedResults.Ok(response);

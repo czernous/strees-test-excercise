@@ -2,89 +2,85 @@
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
-using StressTestApp.Server.Core.Storage.InMemoryStore;
+using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Shared.Models;
+using System.Collections.Concurrent;
 
 namespace StressTestApp.Server.Core.Storage.MarketDataStore;
 
-public sealed class MarketDataStore(ICsvParser csvParser, IOptions<CsvPaths> filePathsOptions) : IInMemoryStore, IDisposable
+public sealed class MarketDataStore(
+    ICsvParser csvParser,
+    IOptions<CsvPaths> filePathsOptions) : IMarketDataStore, IDisposable
 {
     private readonly CsvPaths _filePaths = filePathsOptions.Value;
-    private readonly ICsvParser _parser = csvParser;
-    private readonly SemaphoreSlim _portfolioGate = new(1, 1);
-    private readonly SemaphoreSlim _loanGate = new(1, 1);
-    private readonly SemaphoreSlim _ratingGate = new(1, 1);
+    // Cache using Type as key
+    private readonly ConcurrentDictionary<Type, object> _cache = new();
+    // Granular locks per Type
+    private readonly ConcurrentDictionary<Type, SemaphoreSlim> _locks = new();
+    private HashSet<string> _availableCountries = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlySet<string> AvailableCountries => _availableCountries;
 
-    private IReadOnlyList<Portfolio>? _portfolios;
-    private IReadOnlyList<Loan>? _loans;
-    private IReadOnlyList<Rating>? _ratings;
-
-    private static async Task<IReadOnlyList<T>> GetOrCacheAsync<T>(
-        Func<IReadOnlyList<T>?> getter,
-        Action<IReadOnlyList<T>> setter,
-        SemaphoreSlim gate,
-        Func<CancellationToken, Task<IReadOnlyList<T>>> loader,
-        CancellationToken ct)
-        where T : class
+    public async ValueTask<IReadOnlyList<T>> GetOrCacheAsync<T>(CancellationToken ct) 
+        where T : struct, IIntegrityContract
     {
-        var cached = getter();
-        if (cached is not null)
-            return cached;
+        var type = typeof(T);
 
-        await gate.WaitAsync(ct);
+        if (_cache.TryGetValue(type, out var cached))
+        {
+            return (IReadOnlyList<T>)cached;
+        }
+
+        var semaphore = _locks.GetOrAdd(type, _ => new SemaphoreSlim(1, 1));
+
+        await semaphore.WaitAsync(ct);
         try
         {
-            cached = getter();
-            if (cached is not null)
-                return cached;
+            // Double-check pattern
+            if (_cache.TryGetValue(type, out cached))
+            {
+                return (IReadOnlyList<T>)cached;
+            }
 
-            var loaded = await loader(ct);
-            setter(loaded);
+            var loaded = await LoadByTypeAsync<T>(ct);
+            if (typeof(T) == typeof(Portfolio))
+            {
+                var portfolios = (IReadOnlyList<Portfolio>)loaded;
+                var countries = new HashSet<string>(portfolios.Count / 10, StringComparer.OrdinalIgnoreCase);
+                foreach (var portfolio in portfolios)
+                {
+                    countries.Add(portfolio.Country);
+                }
+                _availableCountries = countries;
+            }
+
+            _cache[type] = loaded;
+
             return loaded;
         }
         finally
         {
-            gate.Release();
+            semaphore.Release();
         }
     }
-    public Task<IReadOnlyList<T>> GetOrCacheAsync<T>(CancellationToken ct) where T : class
+
+    private Task<IReadOnlyList<T>> LoadByTypeAsync<T>(CancellationToken ct) 
+        where T :struct, IIntegrityContract
     {
+        // Keep the explicit mapping logic here to maintain Correctness/Maps
         return typeof(T) switch
         {
-            Type t when t == typeof(Portfolio) => (Task<IReadOnlyList<T>>)(object)GetPortfoliosAsync(ct),
-            Type t when t == typeof(Loan) => (Task<IReadOnlyList<T>>)(object)GetLoansAsync(ct),
-            Type t when t == typeof(Rating) => (Task<IReadOnlyList<T>>)(object)GetRatingsAsync(ct),
-            _ => throw new NotSupportedException($"Type {typeof(T).Name} is not supported by this store.")
+            Type t when t == typeof(Portfolio) => (Task<IReadOnlyList<T>>)(object)csvParser.ParseAsync<Portfolio, PortfolioMap>(_filePaths.Portfolios, ct),
+            Type t when t == typeof(Loan) => (Task<IReadOnlyList<T>>)(object)csvParser.ParseAsync<Loan, LoanMap>(_filePaths.Loans, ct),
+            Type t when t == typeof(Rating) => (Task<IReadOnlyList<T>>)(object)csvParser.ParseAsync<Rating, RatingMap>(_filePaths.Ratings, ct),
+            _ => throw new NotSupportedException($"No parser mapping for {typeof(T).Name}")
         };
     }
 
-    public Task<IReadOnlyList<Portfolio>> GetPortfoliosAsync(CancellationToken ct) =>
-        GetOrCacheAsync(
-            () => _portfolios,
-            loaded => _portfolios = loaded,
-            _portfolioGate,
-            token => _parser.ParseAsync<Portfolio, PortfolioMap>(_filePaths.Portfolios, token),
-            ct);
-
-    public Task<IReadOnlyList<Loan>> GetLoansAsync(CancellationToken ct) =>
-        GetOrCacheAsync(
-            () => _loans,
-            loaded => _loans = loaded,
-            _loanGate,
-            token => _parser.ParseAsync<Loan, LoanMap>(_filePaths.Loans, token),
-            ct);
-
-    public Task<IReadOnlyList<Rating>> GetRatingsAsync(CancellationToken ct) =>
-        GetOrCacheAsync(
-            () => _ratings,
-            loaded => _ratings = loaded,
-            _ratingGate,
-            token => _parser.ParseAsync<Rating, RatingMap>(_filePaths.Ratings, token),
-            ct);
     public void Dispose()
     {
-        _portfolioGate.Dispose();
-        _loanGate.Dispose();
-        _ratingGate.Dispose();
+        foreach (var lockItem in _locks.Values)
+        {
+            lockItem.Dispose();
+        }
     }
 }

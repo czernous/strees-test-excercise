@@ -1,4 +1,6 @@
-﻿namespace StressTestApp.Server.Core.IO.FileLoader;
+﻿using System.Buffers;
+
+namespace StressTestApp.Server.Core.IO.FileLoader;
 
 /// <summary>
 /// Provides functionality to load files asynchronously.
@@ -16,33 +18,20 @@ public class FileLoader : IFileLoader
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the buffer size is less than or equal to zero.</exception>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     /// <remarks>
-    /// The caller is responsible for disposing the returned stream after use.
+    /// The caller is responsible for disposing the returned memory owner after use.
     /// </remarks>
-    public Task<(Stream, FileInfo)> LoadAsync(string path, int bufferSize, CancellationToken ct = default)
+    public async ValueTask<IMemoryOwner<byte>> LoadAsync(string path, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
-        if (bufferSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(bufferSize), "Buffer size must be greater than zero.");
-        }
-
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException($"File not found: {path}");
-        }
-
-
-        Stream fileStream = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read,
-            bufferSize,
-            useAsync: true);
-
         var fileInfo = new FileInfo(path);
+        // Borrow a buffer from the pool based on file size
+        var owner = MemoryPool<byte>.Shared.Rent((int)fileInfo.Length);
 
-        return Task.FromResult((fileStream, fileInfo));
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+
+        // Read directly into the pooled memory
+        int bytesRead = await fs.ReadAsync(owner.Memory, ct);
+
+        // Return the owner so the caller can dispose it (returning it to the pool)
+        return owner;
     }
 }

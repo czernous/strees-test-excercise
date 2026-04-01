@@ -4,15 +4,17 @@ using StressTestApp.Server.Core.Database;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
 using StressTestApp.Server.Core.IO.FileLoader;
-using StressTestApp.Server.Core.Storage.InMemoryStore;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var appDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-var dbFolder = Path.Combine(appDir, "Data", "Db");
-Directory.CreateDirectory(dbFolder);
-var dbPath = Path.Combine(dbFolder, "stresstest.db");
+// Database at repository root (../Data/Db relative to project)
+// Works regardless of build configuration
+var projectDir = Directory.GetCurrentDirectory();
+var dbFolder = Path.Combine(projectDir, "..", "Data", "Db");
+var absoluteDbFolder = Path.GetFullPath(dbFolder);
+Directory.CreateDirectory(absoluteDbFolder);
+var dbPath = Path.Combine(absoluteDbFolder, "stresstest.db");
 
 builder.Services.AddDbContext<StressTestDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
@@ -25,7 +27,9 @@ builder.Services.AddOptionsWithValidateOnStart<CsvPaths>();
 builder.Services.ConfigureOptions<CsvPathsSetup>();
 
 builder.Services.AddSingleton<ICsvParser, CsvParser>();
-builder.Services.AddSingleton<IInMemoryStore, MarketDataStore>();
+builder.Services.AddSingleton<IMarketDataStore, MarketDataStore>();
+
+builder.Services.AddProblemDetails();
 
 builder.Services.AddCarter();
 builder.Services.AddOpenApi();

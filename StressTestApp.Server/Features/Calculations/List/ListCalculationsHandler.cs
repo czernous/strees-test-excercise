@@ -7,11 +7,11 @@ public static class ListCalculationsHandler
 {
     public static async Task<IResult> Handle(
         IStressTestDbContext db,
+        ILogger<ListCalculationsResponse> logger,
         CancellationToken ct)
     {
-        // SQLite doesn't support ordering by DateTimeOffset in SQL
-        // Fetch data and order in memory (acceptable for calculation history)
-        var calculations = await db.Calculations
+        // We avoid fetching the 'Results' collection entirely.
+        var data = await db.Calculations
             .AsNoTracking()
             .Select(c => new
             {
@@ -21,11 +21,15 @@ public static class ListCalculationsHandler
                 c.PortfolioCount,
                 c.LoanCount,
                 c.TotalExpectedLoss,
+                // Projecting just the key-value pairs for the dictionary
                 Inputs = c.Inputs.Select(i => new { i.CountryCode, i.HousePriceChange }).ToList()
             })
             .ToListAsync(ct);
 
-        var summaries = calculations
+        // 2. In-Memory Processing
+        // We order here because of SQLite's DateTimeOffset limitations.
+        // We cap the list or use a reasonable limit if this table grows to 10k+ entries.
+        var summaries = data
             .OrderByDescending(c => c.CreatedAtUtc)
             .Select(c => new CalculationSummary(
                 c.Id,
@@ -38,8 +42,8 @@ public static class ListCalculationsHandler
             ))
             .ToList();
 
-        var response = new ListCalculationsResponse(summaries);
+        logger.LogListRetrieved(summaries.Count);
 
-        return Results.Ok(response);
+        return Results.Ok(new ListCalculationsResponse(summaries));
     }
 }
