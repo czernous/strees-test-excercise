@@ -177,8 +177,8 @@ public sealed partial class CsvParser : ICsvParser
             {
                 rowCount++;
 
-                // Access the explicit interface method to maintain encapsulation.
-                var validationError = ((IIntegrityContract)record).Validate();
+                // Use a constrained interface call to avoid boxing every parsed struct record.
+                var validationError = ValidateRecord(record);
 
                 if (validationError is null)
                 {
@@ -210,4 +210,8 @@ public sealed partial class CsvParser : ICsvParser
             return MinInitialCapacity;
         }
     }
+
+    private static Error? ValidateRecord<T>(T record)
+        where T : struct, IIntegrityContract =>
+        record.Validate();
 }

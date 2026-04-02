@@ -24,6 +24,20 @@ public record Calculation
         IReadOnlyList<PortfolioCalculationResult> calculationResults)
     {
         var id = Guid.CreateVersion7();
+        // Materialize directly into exact-size arrays to avoid extra iterator and builder churn.
+        var inputs = new CalculationInput[housePriceChanges.Count];
+        var inputIndex = 0;
+
+        foreach (var (countryCode, housePriceChange) in housePriceChanges)
+        {
+            inputs[inputIndex++] = CalculationInput.Create(id, countryCode, housePriceChange);
+        }
+
+        var results = new CalculationResult[calculationResults.Count];
+        for (var i = 0; i < calculationResults.Count; i++)
+        {
+            results[i] = CalculationResult.Create(id, calculationResults[i]);
+        }
 
         return new Calculation
         {
@@ -33,8 +47,8 @@ public record Calculation
             PortfolioCount = portfolioCount,
             LoanCount = loanCount,
             TotalExpectedLoss = totalExpectedLoss,
-            Inputs = [.. housePriceChanges.Select(kvp => CalculationInput.Create(id, kvp.Key, kvp.Value))],
-            Results = [.. calculationResults.Select(r => CalculationResult.Create(id, r))]
+            Inputs = inputs,
+            Results = results
         };
     }
 

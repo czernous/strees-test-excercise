@@ -76,7 +76,7 @@ public static class CreateCalculationHandler
         await Task.WhenAll(portfoliosTask, loansTask, ratingsTask);
 
         return Result.Combine(await portfoliosTask, await loansTask, await ratingsTask)
-            .Bind(data => ValidateMarketData(data, logger))
+            .Bind(data => ValidateMarketData(data, marketData.AvailableCountries, logger))
             .TapError(err => logger.LogReferenceDataLoadFailed(err.Code, err.Message));
     }
 
@@ -86,12 +86,13 @@ public static class CreateCalculationHandler
         IStressTestDbContext db,
         ILogger<CreateCalculationResponse> logger,
         CancellationToken ct) =>
-        ValidateCountries(request, data.Portfolios, logger)
+        ValidateCountries(request, data.AvailableCountries, logger)
             .Bind(_ => CheckForDuplicatesAsync(request, db, logger, ct))
             .Bind(_ => RunCalculationAsync(request, data, db, logger, ct));
 
     private static Result<MarketDataSnapshot, Error> ValidateMarketData(
         (IReadOnlyList<Portfolio> Portfolios, IReadOnlyList<Loan> Loans, IReadOnlyList<Rating> Ratings) data,
+        IReadOnlySet<string> availableCountries,
         ILogger logger)
     {
         var (portfolios, loans, ratings) = data;
@@ -105,19 +106,15 @@ public static class CreateCalculationHandler
         }
 
         logger.LogReferenceDataLoaded(portfolios.Count, loans.Count, ratings.Count);
-        return Result.Success(new MarketDataSnapshot(portfolios, loans, ratings));
+        return Result.Success(new MarketDataSnapshot(portfolios, loans, ratings, availableCountries));
     }
 
     private static Result<bool, Error> ValidateCountries(
         CreateCalculationRequest request,
-        IReadOnlyList<Portfolio> portfolios,
+        IReadOnlySet<string> availableCountries,
         ILogger logger)
     {
-        var availableCountries = portfolios
-            .Select(p => p.Country)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
+        // Reuse the cache-admission country index instead of rebuilding the set on every request.
         var unknownCountries = request.HousePriceChanges.Keys
             .Where(code => !availableCountries.Contains(code))
             .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
@@ -203,7 +200,7 @@ public static class CreateCalculationHandler
         ILogger<CreateCalculationResponse> logger,
         CancellationToken ct)
     {
-        var (portfolios, loans, ratings) = marketData;
+        var (portfolios, loans, ratings, _) = marketData;
 
         var sw = Stopwatch.StartNew();
         var operationId = Guid.CreateVersion7();
@@ -252,7 +249,8 @@ public static class CreateCalculationHandler
             calculation.Id,
             calculation.CreatedAtUtc,
             calculation.DurationMs,
-            calculation.GetHousePriceChanges(),
+            // The request payload already has the exact shape the response needs.
+            request.HousePriceChanges,
             calculation.PortfolioCount,
             calculation.LoanCount,
             calculation.TotalExpectedLoss));
@@ -261,5 +259,6 @@ public static class CreateCalculationHandler
     private readonly record struct MarketDataSnapshot(
         IReadOnlyList<Portfolio> Portfolios,
         IReadOnlyList<Loan> Loans,
-        IReadOnlyList<Rating> Ratings);
+        IReadOnlyList<Rating> Ratings,
+        IReadOnlySet<string> AvailableCountries);
 }
