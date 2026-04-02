@@ -1,67 +1,67 @@
 # Latest Benchmark Reference
 
-This file is the committed benchmark snapshot for the most recent reviewed comparison between the original take-home implementation and the current portfolio implementation.
+This file is the committed benchmark snapshot for the latest reviewed GitHub Actions comparison between the original take-home implementation and the current CsvHelper-based portfolio implementation.
 
 Environment:
 - benchmark style: BenchmarkDotNet `ShortRun`
 - comparison model: original baseline vs current candidate
-- machine used for this snapshot: local development machine
-- note: the GitHub Actions workflow runs the same benchmark shape on `ubuntu-latest` to give a stable, branch-to-branch cloud reference
+- runner: `ubuntu-latest`
+- workflow: `.github/workflows/benchmark-compare.yml`
 
 Refs used for this snapshot:
-- original baseline: `portfolio/original-bench` from original submission commit lineage
-- current candidate: `fix` / current polished backend
+- original baseline: `portfolio/original-bench`
+- current candidate: `master`
+- workflow run date: `2026-04-02`
 
-## Summary
+## Matching Benchmarks
 
-| Benchmark | Current | Original | Direction |
-| --- | ---: | ---: | --- |
-| Loan batch, 100k computations | `12.24 ms` | `13.93 ms` | current faster |
-| Portfolio aggregation | `20.98 ms` | `21.08 ms` | essentially equal latency |
-| Portfolio aggregation allocation | `4.77 KB` | `11.45 MB` | current much lower allocation |
-| Cold loan load / parse | `150.68 ms` | `144.11 ms` | original slightly faster |
-| Cold loan load / parse allocation | `44.81 MB` | `27.27 MB` | original lower allocation |
-| Warm cached loan read | `49.05 ns` / `72 B` | `46.53 ns` / `336 B` | latency equivalent, current lower allocation |
-| Small file portfolios load / parse | `1.280 ms` | `1.414 ms` | current slightly faster |
-| Small file ratings load / parse | `1.210 ms` | `1.326 ms` | current slightly faster |
+| Benchmark | Candidate (master) Mean | Baseline (portfolio/original-bench) Mean | Mean Delta | Candidate (master) Allocated | Baseline (portfolio/original-bench) Allocated | Alloc Delta |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `CalculationPipelineBenchmarks.CreateCalculationColdAsync` | `173.68 ms` | `184.86 ms` | `-6.05%` | `29952.71 KB` | `38.53 MB` | `-24.08%` |
+| `CalculationPipelineBenchmarks.CreateCalculationWarmAsync` | `33.49 ms` | `44.06 ms` | `-23.99%` | `998.94 KB` | `12.42 MB` | `-92.15%` |
+| `LoanCalculatorBenchmarks.ComputeBatch` | `16.29 ms` | `16.12 ms` | `+1.05%` | `0 B` | `0 B` | `n/a` |
+| `MarketDataStoreBenchmarks.ColdLoadLoansAsync` | `120,981,863.58 ns` | `110,028,014.20 ns` | `+9.96%` | `29376268 B` | `27204029 B` | `+7.98%` |
+| `MarketDataStoreBenchmarks.WarmCacheLoansAsync` | `67.20 ns` | `57.41 ns` | `+17.05%` | `72 B` | `336 B` | `-78.57%` |
+| `PortfolioCalculatorBenchmarks.CalculatePortfolioStress` | `28.68 ms` | `24.14 ms` | `+18.81%` | `4.77 KB` | `11.45 MB` | `-99.96%` |
 
 ## Interpretation
 
-- The current implementation improves the actual compute path.
-- The current implementation dramatically reduces portfolio aggregation allocations.
-- Warm-cache behavior remains effectively free in both versions, with lower allocation in the current implementation.
-- The original implementation is still slightly better on raw cold loan ingestion time and allocation.
-- That tradeoff is acceptable for the current portfolio design because the new implementation adds stronger correctness, cache admission validation, structured error handling, and observability around the ingestion boundary.
+- The current implementation wins clearly on the end-to-end calculation path in both cold and warm modes.
+- The current implementation dramatically lowers warm request allocation and portfolio aggregation allocation.
+- Warm-cache access remains effectively free in both versions, with lower allocation in the current implementation.
+- The original implementation is still slightly better on isolated cold loan ingestion latency and raw portfolio aggregation latency on this Linux runner.
+- That remaining tradeoff is acceptable because the current implementation keeps stronger correctness, cache-admission validation, structured error handling, and observability while materially improving the actual request path.
 
-## Raw Numbers
+## Candidate-Only Benchmarks
 
-### Current
-
-| Benchmark | Mean | Allocated |
-| --- | ---: | ---: |
-| `LoanCalculator.ComputeBatch` | `12.24 ms` | `-` |
-| `PortfolioCalculator.CalculatePortfolioStress` | `20.98 ms` | `4.77 KB` |
-| `CsvParser.ParseLoansAsync` | `147.70 ms` | `43.76 MB` |
-| `CsvParser.ParsePortfoliosAsync` | `1.280 ms` | `135.71 KB` |
-| `CsvParser.ParseRatingsAsync` | `1.210 ms` | `127.86 KB` |
-| `MarketDataStore.ColdLoadLoansAsync` | `150.68 ms` | `44.81 MB` |
-| `MarketDataStore.WarmCacheLoansAsync` | `49.05 ns` | `72 B` |
-
-### Original
+These are additional diagnostics that exist only in the current branch and are useful for internal analysis rather than direct branch-to-branch scoring.
 
 | Benchmark | Mean | Allocated |
 | --- | ---: | ---: |
-| `LoanCalculator.ComputeBatch` | `13.93 ms` | `-` |
-| `PortfolioCalculator.CalculatePortfolioStress` | `21.08 ms` | `11.45 MB` |
-| `CsvLoader.LoadLoansAsync` | `138.76 ms` | `26.63 MB` |
-| `CsvLoader.LoadPortfoliosAsync` | `1.414 ms` | `90.79 KB` |
-| `CsvLoader.LoadRatingsAsync` | `1.326 ms` | `83.09 KB` |
-| `MarketDataStore.ColdLoadLoansAsync` | `144.11 ms` | `27.27 MB` |
-| `MarketDataStore.WarmCacheLoansAsync` | `46.53 ns` | `336 B` |
+| `CsvParserBenchmarks.ParseLoansAsync` | `112,729.5 μs` | `28683.14 KB` |
+| `CsvParserBenchmarks.ParsePortfoliosAsync` | `617.3 μs` | `134.78 KB` |
+| `CsvParserBenchmarks.ParseRatingsAsync` | `571.3 μs` | `127.13 KB` |
+| `IngestionIsolationBenchmarks.BufferedMaterializeAndValidateWithExactCapacityAsync` | `102,979.5 μs` | `28682.34 KB` |
+| `IngestionIsolationBenchmarks.BufferedMaterializeListWithExactCapacityAsync` | `103,360.9 μs` | `28682.17 KB` |
+| `IngestionIsolationBenchmarks.BufferedMemoryStreamParseAsync` | `99,684.1 μs` | `22433.19 KB` |
+| `IngestionIsolationBenchmarks.DirectCsvHelperParseAsync` | `92,036.3 μs` | `22431.01 KB` |
+| `IngestionIsolationBenchmarks.LoadOnlyAsync` | `175.2 μs` | `1.14 KB` |
+| `IngestionIsolationBenchmarks.ParserLikeMaterializeAndValidateWithExactCapacityAsync` | `122,807.7 μs` | `35713.8 KB` |
+| `IngestionIsolationBenchmarks.ParserLikeMaterializeListWithExactCapacityAsync` | `117,235.7 μs` | `35713.39 KB` |
+| `IngestionIsolationBenchmarks.ParserLikeRawMaterializeAndValidateWithExactCapacityAsync` | `103,462.2 μs` | `36893.65 KB` |
+| `IngestionIsolationBenchmarks.ParserLikeRawMaterializeListWithExactCapacityAsync` | `103,444.0 μs` | `36893.65 KB` |
+
+## Baseline-Only Benchmarks
+
+| Benchmark | Mean | Allocated |
+| --- | ---: | ---: |
+| `CsvLoaderBenchmarks.LoadLoansAsync` | `94,931.5 μs` | `26568.71 KB` |
+| `CsvLoaderBenchmarks.LoadPortfoliosAsync` | `656.2 μs` | `90.9 KB` |
+| `CsvLoaderBenchmarks.LoadRatingsAsync` | `606.0 μs` | `83.23 KB` |
 
 ## Reproducibility
 
-For repeatable branch-to-branch runs in a stable Linux environment, use the GitHub Actions workflow:
+For repeatable branch-to-branch runs in the same Linux environment, use:
 - `.github/workflows/benchmark-compare.yml`
 
 Recommended refs:
