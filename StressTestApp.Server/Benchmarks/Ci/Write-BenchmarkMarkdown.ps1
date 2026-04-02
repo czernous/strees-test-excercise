@@ -143,8 +143,20 @@ function Write-ComparisonMarkdown {
         $baselineByMethod["$($row.Benchmark)|$($row.Method)"] = $row
     }
 
+    $currentKeys = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($row in $CurrentRows) {
+        $null = $currentKeys.Add("$($row.Benchmark)|$($row.Method)")
+    }
+
+    $baselineKeys = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($row in $BaselineRows) {
+        $null = $baselineKeys.Add("$($row.Benchmark)|$($row.Method)")
+    }
+
     $lines = @(
         "# $Heading",
+        "",
+        "## Matching Benchmarks",
         "",
         "| Benchmark | $LeftLabel Mean | $RightLabel Mean | Mean Delta | $LeftLabel Allocated | $RightLabel Allocated | Alloc Delta |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"
@@ -154,7 +166,6 @@ function Write-ComparisonMarkdown {
         $comparisonKey = "$($row.Benchmark)|$($row.Method)"
         $baseline = $baselineByMethod[$comparisonKey]
         if ($null -eq $baseline) {
-            $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | n/a | n/a | $($row.Allocated) | n/a | n/a |"
             continue
         }
 
@@ -173,6 +184,42 @@ function Write-ComparisonMarkdown {
         }
 
         $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | $($baseline.Mean) | $meanDelta | $($row.Allocated) | $($baseline.Allocated) | $allocDelta |"
+    }
+
+    $candidateOnly = @($CurrentRows |
+        Where-Object { -not $baselineKeys.Contains("$($_.Benchmark)|$($_.Method)") } |
+        Sort-Object Benchmark, Method)
+
+    if ($candidateOnly.Count -gt 0) {
+        $lines += @(
+            "",
+            "## Only In $LeftLabel",
+            "",
+            "| Benchmark | Mean | Allocated |",
+            "| --- | ---: | ---: |"
+        )
+
+        foreach ($row in $candidateOnly) {
+            $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | $($row.Allocated) |"
+        }
+    }
+
+    $baselineOnly = @($BaselineRows |
+        Where-Object { -not $currentKeys.Contains("$($_.Benchmark)|$($_.Method)") } |
+        Sort-Object Benchmark, Method)
+
+    if ($baselineOnly.Count -gt 0) {
+        $lines += @(
+            "",
+            "## Only In $RightLabel",
+            "",
+            "| Benchmark | Mean | Allocated |",
+            "| --- | ---: | ---: |"
+        )
+
+        foreach ($row in $baselineOnly) {
+            $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | $($row.Allocated) |"
+        }
     }
 
     $parent = Split-Path -Parent $Path
