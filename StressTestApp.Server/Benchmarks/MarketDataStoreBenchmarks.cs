@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using StressTestApp.Server.Benchmarks.TestSupport;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
 using StressTestApp.Server.Shared.Models;
@@ -58,6 +57,7 @@ public class MarketDataStoreBenchmarks
 
     private MarketDataStore CreateStore() =>
         new(
-            new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter()),
+            new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance),
             Options.Create(_paths));
 }
+

@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Features.Calculations.Compute;
@@ -13,7 +12,7 @@ namespace StressTestApp.Server.Verification;
 public sealed class PortfolioCalculatorConcurrencyTests
 {
     private readonly ICsvParser _parser =
-        new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter());
+        new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance);
 
     [Fact]
     public async Task Calculate_WhenRunConcurrently_ProducesStableDeterministicResults()
@@ -48,3 +47,4 @@ public sealed class PortfolioCalculatorConcurrencyTests
         }
     }
 }
+

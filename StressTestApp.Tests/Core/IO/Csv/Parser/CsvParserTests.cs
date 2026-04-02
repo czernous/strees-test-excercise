@@ -4,7 +4,6 @@ using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 
 namespace StressTestApp.Tests.Core.IO.Csv.Parser;
@@ -17,8 +16,7 @@ public class CsvParserTests
     public CsvParserTests()
     {
         var fileLoader = new FileLoader();
-        var decimalConverter = new DecimalConverter();
-        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance, decimalConverter);
+        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -257,4 +255,8 @@ public class CsvParserTests
         portfolios[1].Id.Should().Be("2");
         portfolios[2].Id.Should().Be("3");
     }
+
 }
+
+
+

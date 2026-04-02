@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
 using StressTestApp.Server.Shared.Models;
@@ -27,7 +26,7 @@ public sealed class MarketDataStoreVerificationTests
     }
 
     private static ICsvParser CreateRealParser() =>
-        new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter());
+        new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance);
 
     [Fact]
     public async Task GetOrCacheAsync_WithRealData_PopulatesCacheAndCountrySet()
@@ -122,3 +121,4 @@ public sealed class MarketDataStoreVerificationTests
         store.AvailableCountries.Should().NotBeEmpty();
     }
 }
+

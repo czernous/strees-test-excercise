@@ -10,7 +10,6 @@ using StressTestApp.Server.Benchmarks.TestSupport;
 using StressTestApp.Server.Core.Database;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
 using StressTestApp.Server.Features.Calculations.Create;
@@ -104,7 +103,7 @@ public class CalculationPipelineBenchmarks
 
     private MarketDataStore CreateStore() =>
         new(
-            new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter()),
+            new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance),
             Options.Create(_paths));
 
     private static async Task<StressTestDbContext> CreateDbContextAsync()
@@ -129,3 +128,5 @@ public class CalculationPipelineBenchmarks
             _ => throw new InvalidOperationException($"Expected Created result but received {result.GetType().Name}.")
         };
 }
+
+

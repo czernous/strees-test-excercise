@@ -3,7 +3,6 @@ using BenchmarkDotNet.Order;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Benchmarks.TestSupport;
 using StressTestApp.Server.Core.IO.Csv.Parser;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Shared.Models;
@@ -21,7 +20,7 @@ public class CsvParserBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _parser = new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter());
+        _parser = new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance);
         _csvDirectory = RepositoryPaths.FindDataCsvDirectory();
     }
 
@@ -37,3 +36,4 @@ public class CsvParserBenchmarks
     public async Task<int> ParseRatingsAsync() =>
         (await _parser.ParseAsync<Rating, RatingMap>(Path.Combine(_csvDirectory, "ratings.csv"))).Value.Count;
 }
+

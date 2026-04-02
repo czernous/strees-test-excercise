@@ -3,7 +3,6 @@ using BenchmarkDotNet.Order;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Benchmarks.TestSupport;
 using StressTestApp.Server.Core.IO.Csv.Parser;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Features.Calculations.Compute;
@@ -24,7 +23,7 @@ public class PortfolioCalculatorBenchmarks
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        var parser = new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance, new DecimalConverter());
+        var parser = new CsvParser(new FileLoader(), NullLogger<CsvParser>.Instance);
         var csvDirectory = RepositoryPaths.FindDataCsvDirectory();
 
         _portfolios = (await parser.ParseAsync<Portfolio, PortfolioMap>(Path.Combine(csvDirectory, "portfolios.csv"))).Value;
@@ -45,3 +44,4 @@ public class PortfolioCalculatorBenchmarks
     public IReadOnlyList<PortfolioCalculationResult> CalculatePortfolioStress() =>
         PortfolioCalculator.Calculate(_loans, _portfolios, _ratings, _housePriceChanges);
 }
+

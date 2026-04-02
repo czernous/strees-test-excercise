@@ -6,17 +6,17 @@ using StressTestApp.Server.Shared.Primitives.Result;
 namespace StressTestApp.Server.Core.IO.Csv.Parser;
 
 /// <summary>
-/// Defines a contract for high-performance, forward-only CSV parsing using memory spans.
+/// Defines the ingestion parsing boundary for reference-data files.
 /// </summary>
 public interface ICsvParser
 {
     /// <summary>
-    /// Parses a raw byte buffer into a collection of domain models.
+    /// Parses a CSV file into validated domain models ready for cache admission.
     /// </summary>
-    /// <param name="data">The raw UTF-8 encoded byte data to parse.</param>
+    /// <param name="filePath">The physical path to the CSV source file.</param>
     /// <returns>
-    /// A <see cref="Result{T, E}"/> containing the parsed records or a detailed error 
-    /// if the schema or data integrity is compromised.
+    /// A <see cref="Result{T, E}"/> containing the parsed records or a detailed error
+    /// if file loading, CSV structure, or record integrity fails.
     /// </returns>
     ValueTask<Result<IReadOnlyList<T>, Error>> ParseAsync<T, TMap>(
          string filePath,

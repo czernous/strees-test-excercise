@@ -2,7 +2,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
-using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Features.Calculations.Compute;
 using StressTestApp.Server.Shared.Models;
@@ -17,8 +16,7 @@ public class CalculationIntegrationTests
     public CalculationIntegrationTests()
     {
         var fileLoader = new FileLoader();
-        var decimalConverter = new DecimalConverter();
-        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance, decimalConverter);
+                _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -230,3 +228,4 @@ public class CalculationIntegrationTests
         });
     }
 }
+

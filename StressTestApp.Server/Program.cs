@@ -6,7 +6,6 @@ using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
-using DecimalConverter = StressTestApp.Server.Core.IO.Csv.Parser.Converters.DecimalConverter;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +27,6 @@ builder.Services.AddSingleton<IFileLoader, FileLoader>();
 builder.Services.AddOptionsWithValidateOnStart<CsvPaths>();
 builder.Services.ConfigureOptions<CsvPathsSetup>();
 
-builder.Services.AddSingleton<DecimalConverter>();
 builder.Services.AddSingleton<ICsvParser, CsvParser>();
 builder.Services.AddSingleton<IMarketDataStore, MarketDataStore>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -62,3 +60,4 @@ app.UseHttpsRedirection();
 app.MapHealthChecks("/health");
 
 await app.RunAsync();
+
