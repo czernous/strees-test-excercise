@@ -53,7 +53,7 @@ jobs:
         shell: pwsh
         working-directory: repo/StressTestApp.Server
         run: >
-          dotnet run -c Release --project Benchmarks/StressTestApp.Benchmarks.csproj -- --filter *
+          dotnet run -c Release --project Benchmarks/StressTestApp.Benchmarks.csproj
 
       - name: Resolve benchmark results directory
         id: results
