@@ -34,9 +34,9 @@ function Convert-TimeToNanoseconds {
 
     switch ($unit) {
         "ns" { return $number }
-        "us" { return $number * 1_000 }
-        "ms" { return $number * 1_000_000 }
-        "s"  { return $number * 1_000_000_000 }
+        "us" { return $number * 1000 }
+        "ms" { return $number * 1000000 }
+        "s"  { return $number * 1000000000 }
         default { return $null }
     }
 }
@@ -68,21 +68,24 @@ function Convert-AllocatedToBytes {
 function Read-BenchmarkRows {
     param([string]$Directory)
 
-    $rows = @()
+    $rows = [System.Collections.Generic.List[object]]::new()
     Get-ChildItem -Path $Directory -Filter "*-report.csv" | Sort-Object Name | ForEach-Object {
         $csvRows = Import-Csv $_.FullName
+        $benchmark = $_.BaseName -replace '-report$', ''
+
         foreach ($row in $csvRows) {
-            $rows += [pscustomobject]@{
+            $rows.Add([pscustomobject]@{
+                Benchmark      = $benchmark
                 Method         = $row.Method
                 Mean           = $row.Mean
                 MeanNs         = Convert-TimeToNanoseconds $row.Mean
                 Allocated      = $row.Allocated
                 AllocatedBytes = Convert-AllocatedToBytes $row.Allocated
-            }
+            })
         }
     }
 
-    return $rows
+    return $rows.ToArray()
 }
 
 function Format-PercentDelta {
@@ -113,11 +116,15 @@ function Write-SummaryMarkdown {
         "| --- | ---: | ---: |"
     )
 
-    foreach ($row in $Rows | Sort-Object Method) {
-        $lines += "| $($row.Method) | $($row.Mean) | $($row.Allocated) |"
+    foreach ($row in $Rows | Sort-Object Benchmark, Method) {
+        $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | $($row.Allocated) |"
     }
 
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null
+    $parent = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+
     Set-Content -Path $Path -Value $lines
 }
 
@@ -133,7 +140,7 @@ function Write-ComparisonMarkdown {
 
     $baselineByMethod = @{}
     foreach ($row in $BaselineRows) {
-        $baselineByMethod[$row.Method] = $row
+        $baselineByMethod["$($row.Benchmark)|$($row.Method)"] = $row
     }
 
     $lines = @(
@@ -143,10 +150,11 @@ function Write-ComparisonMarkdown {
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"
     )
 
-    foreach ($row in $CurrentRows | Sort-Object Method) {
-        $baseline = $baselineByMethod[$row.Method]
+    foreach ($row in $CurrentRows | Sort-Object Benchmark, Method) {
+        $comparisonKey = "$($row.Benchmark)|$($row.Method)"
+        $baseline = $baselineByMethod[$comparisonKey]
         if ($null -eq $baseline) {
-            $lines += "| $($row.Method) | $($row.Mean) | n/a | n/a | $($row.Allocated) | n/a | n/a |"
+            $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | n/a | n/a | $($row.Allocated) | n/a | n/a |"
             continue
         }
 
@@ -164,10 +172,14 @@ function Write-ComparisonMarkdown {
             Format-PercentDelta -Current $row.AllocatedBytes -Baseline $baseline.AllocatedBytes
         }
 
-        $lines += "| $($row.Method) | $($row.Mean) | $($baseline.Mean) | $meanDelta | $($row.Allocated) | $($baseline.Allocated) | $allocDelta |"
+        $lines += "| $($row.Benchmark) / $($row.Method) | $($row.Mean) | $($baseline.Mean) | $meanDelta | $($row.Allocated) | $($baseline.Allocated) | $allocDelta |"
     }
 
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null
+    $parent = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+
     Set-Content -Path $Path -Value $lines
 }
 
