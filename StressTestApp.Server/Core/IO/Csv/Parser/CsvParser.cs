@@ -54,21 +54,20 @@ public sealed partial class CsvParser : ICsvParser
             BadDataFound = null,
             BufferSize = FileStreamBufferSize,
             CacheFields = true,
-            IncludePrivateMembers = true,
+            IncludePrivateMembers = false,
             ShouldUseConstructorParameters = _ => true,
 
             // Optimization: Filter out blank lines and whitespace-only rows at the parser level.
             ShouldSkipRecord = args =>
             {
-                var record = args.Row.Parser.Record;
-                return record is null or { Length: 0 } || record.All(string.IsNullOrWhiteSpace);
+                return IsBlankRecord(args.Row.Parser.Record);
             },
 
             // Resilience: Only halt on structural corruption; skip insignificant conversion errors on blank lines.
             ReadingExceptionOccurred = static args =>
             {
                 return args.Exception is CsvHelper.TypeConversion.TypeConverterException &&
-                       args.Exception.Context?.Parser?.Record?.All(string.IsNullOrWhiteSpace) == true;
+                       IsBlankRecord(args.Exception.Context?.Parser?.Record);
             }
         };
     }
@@ -99,14 +98,15 @@ public sealed partial class CsvParser : ICsvParser
         where TMap : ClassMap<T>
     {
         // Functional bind: If LoadAsync succeeds, move to EnumerateRecords. If it fails, return the Error.
-        return await (await _fileLoader.LoadAsync(filePath, FileStreamBufferSize, ct))
-            .Bind(data => EnumerateRecords<T, TMap>(data, filePath, ct).AsTask());
+        // File loading is the only real async boundary here; the in-memory parse itself stays synchronous.
+        var fileData = await _fileLoader.LoadAsync(filePath, FileStreamBufferSize, ct);
+        return fileData.Bind(data => EnumerateRecords<T, TMap>(data, filePath, ct));
     }
 
     /// <summary>
     /// Orchestrates the collection of records from the stream into a pre-sized list.
     /// </summary>
-    private async ValueTask<Result<IReadOnlyList<T>, Error>> EnumerateRecords<T, TMap>(
+    private Result<IReadOnlyList<T>, Error> EnumerateRecords<T, TMap>(
         (IMemoryOwner<byte> MemoryOwner, int BytesRead) fileData,
         string filePath,
         CancellationToken ct = default)
@@ -114,11 +114,12 @@ public sealed partial class CsvParser : ICsvParser
         where TMap : ClassMap<T>
     {
         // Pre-size the list based on file metadata to minimize LOH fragmentation and re-allocations.
-        var records = new List<T>(EstimateInitialCapacity(filePath));
+        // Size from bytes already loaded to avoid a second FileInfo lookup on the hot ingest path.
+        var records = new List<T>(EstimateInitialCapacity(fileData.BytesRead));
 
         try
         {
-            await foreach (var record in GetRecords<T, TMap>(fileData, filePath, ct))
+            foreach (var record in GetRecords<T, TMap>(fileData, filePath, ct))
             {
                 records.Add(record);
             }
@@ -147,10 +148,10 @@ public sealed partial class CsvParser : ICsvParser
     /// <summary>
     /// Bridges the pooled <see cref="IMemoryOwner{T}"/> to the CSV reader logic via <see cref="MemoryMarshal"/>.
     /// </summary>
-    private async IAsyncEnumerable<T> GetRecords<T, TMap>(
+    private IEnumerable<T> GetRecords<T, TMap>(
         (IMemoryOwner<byte> MemoryOwner, int BytesRead) fileData,
         string filePath,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        CancellationToken ct = default)
         where TMap : ClassMap<T>
         where T : struct, IIntegrityContract
     {
@@ -165,7 +166,7 @@ public sealed partial class CsvParser : ICsvParser
             var slicedSegment = new ArraySegment<byte>(segment.Array!, segment.Offset, fileData.BytesRead);
 
             using var stream = new MemoryStream(slicedSegment.Array!, slicedSegment.Offset, slicedSegment.Count, writable: false);
-            using var reader = new StreamReader(stream, Encoding.UTF8, true, FileStreamBufferSize);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, FileStreamBufferSize);
             using var csv = new CsvReader(reader, _csvConfig);
 
             // Register specialized domain converters.
@@ -173,8 +174,9 @@ public sealed partial class CsvParser : ICsvParser
             csv.Context.RegisterClassMap<TMap>();
 
             int rowCount = 0;
-            await foreach (var record in csv.GetRecordsAsync<T>(ct))
+            foreach (var record in csv.GetRecords<T>())
             {
+                ct.ThrowIfCancellationRequested();
                 rowCount++;
 
                 // Use a constrained interface call to avoid boxing every parsed struct record.
@@ -195,23 +197,36 @@ public sealed partial class CsvParser : ICsvParser
     /// <summary>
     /// Heuristically estimates the required capacity for the record list to optimize memory usage.
     /// </summary>
-    private static int EstimateInitialCapacity(string filePath)
+    private static int EstimateInitialCapacity(int bytesRead)
     {
-        try
-        {
-            var fileInfo = new FileInfo(filePath);
-            if (fileInfo.Length <= 0) return MinInitialCapacity;
-
-            var estimatedRows = (int)(fileInfo.Length / EstimatedBytesPerRow);
-            return Math.Clamp(estimatedRows, MinInitialCapacity, MaxInitialCapacity);
-        }
-        catch
+        if (bytesRead <= 0)
         {
             return MinInitialCapacity;
         }
+
+        var estimatedRows = bytesRead / EstimatedBytesPerRow;
+        return Math.Clamp(estimatedRows, MinInitialCapacity, MaxInitialCapacity);
     }
 
     private static Error? ValidateRecord<T>(T record)
         where T : struct, IIntegrityContract =>
         record.Validate();
+
+    private static bool IsBlankRecord(string[]? record)
+    {
+        if (record is null || record.Length == 0)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < record.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(record[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
