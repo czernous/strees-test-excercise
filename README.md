@@ -82,6 +82,7 @@ The repository contains three layers of evidence:
 - unit and integration tests in `StressTestApp.Tests`
 - concurrency and cache verification tests in `StressTestApp.Server/Verification`
 - hot-path benchmarks in `StressTestApp.Server/Benchmarks`
+- a committed benchmark reference snapshot in `docs/benchmarks/latest-linux-comparison.md`
 
 ### Current benchmark highlights
 
@@ -93,6 +94,12 @@ Measured on the local development machine with BenchmarkDotNet `ShortRun`:
 - warm cached loan read: about `49.05 ns`
 
 These numbers are not presented as universal truth; they are included to demonstrate actual measurement of the intended hot paths.
+
+For the stable reviewer-facing snapshot, see:
+- `docs/benchmarks/latest-linux-comparison.md`
+
+For reproducible branch-to-branch reruns in CI, use:
+- `.github/workflows/benchmark-compare.yml`
 
 ## Prerequisites
 
