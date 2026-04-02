@@ -1,42 +1,47 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using StressTestApp.Server.Core.Storage.MarketDataStore;
-using StressTestApp.Server.Shared.Models;
-
 namespace StressTestApp.Server.Features.Countries.List;
+
+using Microsoft.AspNetCore.Http.HttpResults;
+using StressTestApp.Server.Core.Storage.MarketDataStore;
+using StressTestApp.Server.Extensions;
+using StressTestApp.Server.Features.Countries;
+using StressTestApp.Server.Shared.Models;
+using StressTestApp.Server.Shared.Primitives.Errors;
+using StressTestApp.Server.Shared.Primitives.Result;
 
 public static class ListCountriesHandler
 {
-    public static async Task<Results<Ok<ListCountriesResponse>, NotFound, ProblemHttpResult>> Handle(
+    public static async Task<Results<Ok<ListCountriesResponse>, InternalServerError<HttpError>>> Handle(
         IMarketDataStore store,
         ILogger<ListCountriesResponse> logger,
-        CancellationToken ct
-    )
+        CancellationToken ct) =>
+        (await GetCountriesAsync(store, logger, ct))
+            .Match<Results<Ok<ListCountriesResponse>, InternalServerError<HttpError>>>(
+                ToOk,
+                ToInternalServerError);
+
+    private static Task<Result<IReadOnlySet<string>, Error>> GetCountriesAsync(
+        IMarketDataStore store,
+        ILogger<ListCountriesResponse> logger,
+        CancellationToken ct) =>
+        store.GetOrCacheAsync<Portfolio>(ct).AsTask()
+            .TapError(err => logger.LogCountryLoadFailed(err.Code, err.Message))
+            .Map(_ => store.AvailableCountries)
+            .Ensure(
+                countries => countries.Count > 0,
+                _ => CreateNoCountriesError(logger))
+            .Tap(countries => logger.LogCountriesRetrieved(countries.Count));
+
+    private static Results<Ok<ListCountriesResponse>, InternalServerError<HttpError>> ToOk(IReadOnlySet<string> countries) =>
+        TypedResults.Ok(new ListCountriesResponse([.. countries]));
+
+    private static Results<Ok<ListCountriesResponse>, InternalServerError<HttpError>> ToInternalServerError(Error err) =>
+        err.ToListErrorResult<ListCountriesResponse>();
+
+    private static Error CreateNoCountriesError(ILogger logger)
     {
-        try
-        {
-            var portfolios = await store.GetOrCacheAsync<Portfolio>(ct);
-
-            var countries = store.AvailableCountries;
-
-            if (countries.Count == 0)
-            {
-                logger.LogNoCountriesFound();
-                return TypedResults.NotFound();
-            }
-
-            logger.LogCountriesRetrieved(countries.Count);
-            return TypedResults.Ok(new ListCountriesResponse([.. countries]));
-        }
-        catch (Exception ex)
-        {
-            // Log the full stack trace for the developer, 
-            // but return a generic message to the user.
-            logger.LogCountryExtractionError(ex);
-
-            return TypedResults.Problem(
-                detail: "An error occurred while retrieving available countries.",
-                statusCode: StatusCodes.Status500InternalServerError
-            );
-        }
+        logger.LogNoCountriesFound();
+        return Error.Create(
+            ErrorCode.Validation.DataIntegrityViolation,
+            "No supported countries are available in the portfolio data.");
     }
 }

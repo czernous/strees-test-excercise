@@ -1,49 +1,85 @@
+namespace StressTestApp.Server.Features.Calculations.List;
+
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using StressTestApp.Server.Core.Database;
-
-namespace StressTestApp.Server.Features.Calculations.List;
+using StressTestApp.Server.Extensions;
+using StressTestApp.Server.Features.Calculations;
+using StressTestApp.Server.Shared.Models;
+using StressTestApp.Server.Shared.Primitives.Errors;
+using StressTestApp.Server.Shared.Primitives.Result;
 
 public static class ListCalculationsHandler
 {
-    public static async Task<IResult> Handle(
+    private const int MaxRecentCalculations = 100;
+
+    public static async Task<Results<Ok<ListCalculationsResponse>, InternalServerError<HttpError>>> Handle(
         IStressTestDbContext db,
         ILogger<ListCalculationsResponse> logger,
-        CancellationToken ct)
-    {
-        // We avoid fetching the 'Results' collection entirely.
-        var data = await db.Calculations
-            .AsNoTracking()
-            .Select(c => new
-            {
-                c.Id,
-                c.CreatedAtUtc,
-                c.DurationMs,
-                c.PortfolioCount,
-                c.LoanCount,
-                c.TotalExpectedLoss,
-                // Projecting just the key-value pairs for the dictionary
-                Inputs = c.Inputs.Select(i => new { i.CountryCode, i.HousePriceChange }).ToList()
-            })
-            .ToListAsync(ct);
+        CancellationToken ct) =>
+        (await FetchCalculationsAsync(db, logger, ct))
+            .Match<Results<Ok<ListCalculationsResponse>, InternalServerError<HttpError>>>(
+                ToOk,
+                ToInternalServerError);
 
-        // 2. In-Memory Processing
-        // We order here because of SQLite's DateTimeOffset limitations.
-        // We cap the list or use a reasonable limit if this table grows to 10k+ entries.
-        var summaries = data
-            .OrderByDescending(c => c.CreatedAtUtc)
-            .Select(c => new CalculationSummary(
-                c.Id,
-                c.CreatedAtUtc,
-                c.DurationMs,
-                c.PortfolioCount,
-                c.LoanCount,
-                c.TotalExpectedLoss,
-                c.Inputs.ToDictionary(i => i.CountryCode, i => i.HousePriceChange)
-            ))
-            .ToList();
+    private static Task<Result<ListCalculationsResponse, Error>> FetchCalculationsAsync(
+        IStressTestDbContext db,
+        ILogger<ListCalculationsResponse> logger,
+        CancellationToken ct) =>
+        Result.TryAsync(
+            async token => await db.Calculations
+                .AsNoTracking()
+                .Select(c => new CalculationProjection(
+                    c.Id,
+                    c.CreatedAtUtc,
+                    c.DurationMs,
+                    c.PortfolioCount,
+                    c.LoanCount,
+                    c.TotalExpectedLoss,
+                    c.Inputs.Select(i => new InputProjection(i.CountryCode, i.HousePriceChange))))
+                .Take(MaxRecentCalculations)
+                .ToListAsync(token),
+            ex =>
+                {
+                    logger.LogListFailed(ex);
+                    return Error.Create(
+                        ErrorCode.Database.QueryFailed,
+                        "Failed to list calculations.");
+                },
+            ct)
+            .Map(MapResponse)
+            .Tap(response => logger.LogListRetrieved(response.Calculations.Count));
 
-        logger.LogListRetrieved(summaries.Count);
+    private static ListCalculationsResponse MapResponse(IReadOnlyList<CalculationProjection> data) =>
+        new(
+            [.. data
+                .OrderByDescending(c => c.CreatedAtUtc)
+                .Select(c => new CalculationSummary(
+                    c.Id,
+                    c.CreatedAtUtc,
+                    c.DurationMs,
+                    c.PortfolioCount,
+                    c.LoanCount,
+                    c.TotalExpectedLoss,
+                    c.Inputs.ToDictionary(i => i.CountryCode, i => i.HousePriceChange)
+                ))]);
 
-        return Results.Ok(new ListCalculationsResponse(summaries));
-    }
+    private static Results<Ok<ListCalculationsResponse>, InternalServerError<HttpError>> ToOk(ListCalculationsResponse response) =>
+        TypedResults.Ok(response);
+
+    private static Results<Ok<ListCalculationsResponse>, InternalServerError<HttpError>> ToInternalServerError(Error err) =>
+        err.ToListErrorResult<ListCalculationsResponse>();
+
+    private sealed record CalculationProjection(
+        Guid Id,
+        DateTimeOffset CreatedAtUtc,
+        long DurationMs,
+        int PortfolioCount,
+        int LoanCount,
+        decimal TotalExpectedLoss,
+        IEnumerable<InputProjection> Inputs);
+
+    private sealed record InputProjection(
+        string CountryCode,
+        decimal HousePriceChange);
 }

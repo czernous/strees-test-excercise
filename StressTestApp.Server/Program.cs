@@ -1,10 +1,12 @@
 using Carter;
 using Microsoft.EntityFrameworkCore;
 using StressTestApp.Server.Core.Database;
+using StressTestApp.Server.Core.Exceptions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Core.Storage.MarketDataStore;
+using DecimalConverter = StressTestApp.Server.Core.IO.Csv.Parser.Converters.DecimalConverter;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,10 +28,10 @@ builder.Services.AddSingleton<IFileLoader, FileLoader>();
 builder.Services.AddOptionsWithValidateOnStart<CsvPaths>();
 builder.Services.ConfigureOptions<CsvPathsSetup>();
 
+builder.Services.AddSingleton<DecimalConverter>();
 builder.Services.AddSingleton<ICsvParser, CsvParser>();
 builder.Services.AddSingleton<IMarketDataStore, MarketDataStore>();
-
-builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddCarter();
 builder.Services.AddOpenApi();
@@ -48,6 +50,7 @@ api.MapCarter();
 
 app.UseDefaultFiles();
 app.MapStaticAssets();
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {

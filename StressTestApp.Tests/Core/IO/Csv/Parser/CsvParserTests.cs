@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Shared.Models;
+using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
+using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
 using StressTestApp.Server.Core.IO.FileLoader;
 
 namespace StressTestApp.Tests.Core.IO.Csv.Parser;
@@ -15,7 +17,8 @@ public class CsvParserTests
     public CsvParserTests()
     {
         var fileLoader = new FileLoader();
-        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance);
+        var decimalConverter = new DecimalConverter();
+        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance, decimalConverter);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -29,8 +32,9 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(3);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().HaveCount(3);
     }
 
     [Fact]
@@ -43,7 +47,8 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
         // Assert
-        var firstLoan = result[0];
+        result.IsSuccess.Should().BeTrue();
+        var firstLoan = result.Value[0];
         firstLoan.Id.Should().Be(1, "Loan_ID header should map to Id property");
         firstLoan.PortId.Should().Be(101, "Port_ID header should map to PortId property");
         firstLoan.OriginalAmount.Should().Be(100000, "OriginalLoanAmount header should map to OriginalAmount property");
@@ -62,8 +67,9 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(3);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().HaveCount(3);
     }
 
     [Fact]
@@ -76,7 +82,8 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
 
         // Assert
-        var firstPortfolio = result[0];
+        result.IsSuccess.Should().BeTrue();
+        var firstPortfolio = result.Value[0];
         firstPortfolio.Id.Should().Be("101", "Port_ID header should map to Id property");
         firstPortfolio.Name.Should().Be("Test Portfolio 1", "Port_Name header should map to Name property");
         firstPortfolio.Country.Should().Be("US", "Port_Country header should map to Country property");
@@ -93,8 +100,9 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Rating, RatingMap>(filePath);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(4);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().HaveCount(4);
     }
 
     [Fact]
@@ -107,11 +115,12 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Rating, RatingMap>(filePath);
 
         // Assert
-        var firstRating = result[0];
+        result.IsSuccess.Should().BeTrue();
+        var firstRating = result.Value[0];
         firstRating.RatingValue.Should().Be("AAA", "Rating header should map to RatingValue property");
         firstRating.ProbabilityOfDefault.Should().Be(1, "ProbablilityOfDefault header should map to ProbabilityOfDefault property");
 
-        var lastRating = result[3];
+        var lastRating = result.Value[3];
         lastRating.RatingValue.Should().Be("BBB");
         lastRating.ProbabilityOfDefault.Should().Be(40);
     }
@@ -126,35 +135,38 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task LoadCsvAsync_WithIncorrectHeaders_ThrowsException()
+    public async Task LoadCsvAsync_WithIncorrectHeaders_ReturnsFailureResult()
     {
         // Arrange
         var filePath = Path.Combine(_testDataPath, "invalid_headers.csv");
 
         // Act
-        var act = async () => await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
-        // Assert
-        await act.Should().ThrowAsync<Exception>();
+        // Assert - Should return failure Result with validation error
+        result.IsSuccess.Should().BeFalse("Headers don't match expected schema");
+        result.Error.Code.Should().StartWith("VAL_", "Should be a validation error");
     }
 
     [Fact]
-    public async Task LoadCsvAsync_WithNonExistentFile_ThrowsFileNotFoundException()
+    public async Task LoadCsvAsync_WithNonExistentFile_ReturnsFailureResult()
     {
         // Arrange
         var filePath = Path.Combine(_testDataPath, "nonexistent.csv");
 
         // Act
-        var act = async () => await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
-        // Assert
-        await act.Should().ThrowAsync<FileNotFoundException>()
-            .WithMessage("*nonexistent.csv*");
+        // Assert - Should return failure Result with IO error
+        result.IsSuccess.Should().BeFalse("File doesn't exist");
+        result.Error.Code.Should().StartWith("IO_", "Should be an IO error");
+        result.Error.Message.Should().Contain("nonexistent.csv");
     }
 
     [Fact]
@@ -167,10 +179,12 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
         // Assert
-        result.Should().HaveCount(3);
-        result[0].CreditRating.Should().Be("AAA", "leading and trailing whitespace should be trimmed");
-        result[1].CreditRating.Should().Be("AA", "trailing whitespace should be trimmed");
-        result[2].CreditRating.Should().Be("A", "leading whitespace should be trimmed");
+        result.IsSuccess.Should().BeTrue();
+        var loans = result.Value;
+        loans.Should().HaveCount(3);
+        loans[0].CreditRating.Should().Be("AAA", "leading and trailing whitespace should be trimmed");
+        loans[1].CreditRating.Should().Be("AA", "trailing whitespace should be trimmed");
+        loans[2].CreditRating.Should().Be("A", "leading whitespace should be trimmed");
     }
 
     [Fact]
@@ -184,9 +198,11 @@ public class CsvParserTests
         var result2 = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
 
         // Assert
-        result1.Should().HaveCount(3);
-        result2.Should().HaveCount(3);
-        result1.Should().BeEquivalentTo(result2);
+        result1.IsSuccess.Should().BeTrue();
+        result2.IsSuccess.Should().BeTrue();
+        result1.Value.Should().HaveCount(3);
+        result2.Value.Should().HaveCount(3);
+        result1.Value.Should().BeEquivalentTo(result2.Value);
     }
 
     [Fact]
@@ -207,10 +223,12 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
 
         // Assert - Parser skips rows with ANY empty field
-        result.Should().HaveCount(2, "Only rows without empty fields should be loaded");
-        result.Should().Contain(p => p.Id == "1" && p.Country == "US");
-        result.Should().Contain(p => p.Id == "4" && p.Country == "FR");
-        result.Should().AllSatisfy(p => p.IsValid.Should().BeTrue());
+        result.IsSuccess.Should().BeTrue();
+        var portfolios = result.Value;
+        portfolios.Should().HaveCount(2, "Only rows without empty fields should be loaded");
+        portfolios.Should().Contain(p => p.Id == "1" && p.Country == "US");
+        portfolios.Should().Contain(p => p.Id == "4" && p.Country == "FR");
+        portfolios.Should().AllSatisfy(p => ((IIntegrityContract)p).Validate().Should().BeNull());
     }
 
     [Fact]
@@ -232,9 +250,11 @@ public class CsvParserTests
         var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
 
         // Assert - Only valid rows loaded, blank rows skipped
-        result.Should().HaveCount(3);
-        result[0].Id.Should().Be("1");
-        result[1].Id.Should().Be("2");
-        result[2].Id.Should().Be("3");
+        result.IsSuccess.Should().BeTrue();
+        var portfolios = result.Value;
+        portfolios.Should().HaveCount(3);
+        portfolios[0].Id.Should().Be("1");
+        portfolios[1].Id.Should().Be("2");
+        portfolios[2].Id.Should().Be("3");
     }
 }

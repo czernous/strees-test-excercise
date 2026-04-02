@@ -6,6 +6,8 @@ using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
 using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Shared.Models;
+using StressTestApp.Server.Shared.Primitives.Result;
+using StressTestApp.Server.Shared.Primitives.Errors;
 
 namespace StressTestApp.Tests.Core.Storage.MarketDataStore;
 
@@ -53,13 +55,14 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(expectedPortfolios);
+            .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios));
 
         // Act
-        var result = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
+        var resultTask = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
 
         // Assert
-        result.Should().BeEquivalentTo(expectedPortfolios);
+        resultTask.IsSuccess.Should().BeTrue();
+        resultTask.Value.Should().BeEquivalentTo(expectedPortfolios);
         await _mockParser
             .Received(1)
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
@@ -76,16 +79,18 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(expectedPortfolios);
+            .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios));
 
         // Act
-        var firstResult = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
-        var secondResult = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
+        var firstResultTask = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
+        var secondResultTask = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
 
         // Assert
-        firstResult.Should().BeEquivalentTo(expectedPortfolios);
-        secondResult.Should().BeEquivalentTo(expectedPortfolios);
-        secondResult.Should().BeSameAs(firstResult, "Second call should return exact same cached instance");
+        firstResultTask.IsSuccess.Should().BeTrue();
+        secondResultTask.IsSuccess.Should().BeTrue();
+        firstResultTask.Value.Should().BeEquivalentTo(expectedPortfolios);
+        secondResultTask.Value.Should().BeEquivalentTo(expectedPortfolios);
+        secondResultTask.Value.Should().BeSameAs(firstResultTask.Value, "Second call should return exact same cached instance");
         await _mockParser
                 .Received(1)
                 .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
@@ -103,10 +108,8 @@ public class MarketDataStoreTests : IDisposable
         var loadDelay = TimeSpan.FromMilliseconds(100);
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-       .Returns(callInfo =>
-       {
-           return Task.Delay(loadDelay).ContinueWith(_ => (IReadOnlyList<Portfolio>)expectedPortfolios);
-       });
+            .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Portfolio>, Error>>(
+                Task.Delay(loadDelay).ContinueWith(_ => Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios))));
 
         // Act - Start 5 concurrent calls
         var tasks = Enumerable.Range(0, 5)
@@ -116,8 +119,12 @@ public class MarketDataStoreTests : IDisposable
         var results = await Task.WhenAll(tasks);
 
         // Assert
-        results.Should().AllSatisfy(r => r.Should().BeEquivalentTo(expectedPortfolios));
-        results.Should().OnlyContain(r => ReferenceEquals(r, results[0]), "All should reference same cached instance");
+        results.Should().AllSatisfy(r =>
+        {
+            r.IsSuccess.Should().BeTrue();
+            r.Value.Should().BeEquivalentTo(expectedPortfolios);
+        });
+        results.Should().OnlyContain(r => ReferenceEquals(r.Value, results[0].Value), "All should reference same cached instance");
         await _mockParser
                  .Received(1)
                  .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
@@ -135,13 +142,14 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
-            .Returns(expectedLoans);
+            .Returns(Result<IReadOnlyList<Loan>, Error>.Ok(expectedLoans));
 
         // Act
-        var result = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
+        var resultTask = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
 
         // Assert
-        result.Should().BeEquivalentTo(expectedLoans);
+        resultTask.IsSuccess.Should().BeTrue();
+        resultTask.Value.Should().BeEquivalentTo(expectedLoans);
         await _mockParser
             .Received(1)
             .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>());
@@ -158,16 +166,18 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
-            .Returns(expectedLoans);
+            .Returns(Result<IReadOnlyList<Loan>, Error>.Ok(expectedLoans));
 
         // Act
-        var firstResult = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
-        var secondResult = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
+        var firstResultTask = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
+        var secondResultTask = await _store.GetOrCacheAsync<Loan>(CancellationToken.None);
 
         // Assert
-        firstResult.Should().BeEquivalentTo(expectedLoans);
-        secondResult.Should().BeEquivalentTo(expectedLoans);
-        secondResult.Should().BeSameAs(firstResult);
+        firstResultTask.IsSuccess.Should().BeTrue();
+        secondResultTask.IsSuccess.Should().BeTrue();
+        firstResultTask.Value.Should().BeEquivalentTo(expectedLoans);
+        secondResultTask.Value.Should().BeEquivalentTo(expectedLoans);
+        secondResultTask.Value.Should().BeSameAs(firstResultTask.Value);
         await _mockParser
             .Received(1)
             .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>());
@@ -185,13 +195,14 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
-            .Returns(expectedRatings);
+            .Returns(Result<IReadOnlyList<Rating>, Error>.Ok(expectedRatings));
 
         // Act
-        var result = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
+        var resultTask = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
 
         // Assert
-        result.Should().BeEquivalentTo(expectedRatings);
+        resultTask.IsSuccess.Should().BeTrue();
+        resultTask.Value.Should().BeEquivalentTo(expectedRatings);
         await _mockParser
             .Received(1)
             .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
@@ -208,16 +219,18 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
-            .Returns(expectedRatings);
+            .Returns(Result<IReadOnlyList<Rating>, Error>.Ok(expectedRatings));
 
         // Act
-        var firstResult = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
-        var secondResult = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
+        var firstResultTask = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
+        var secondResultTask = await _store.GetOrCacheAsync<Rating>(CancellationToken.None);
 
         // Assert
-        firstResult.Should().BeEquivalentTo(expectedRatings);
-        secondResult.Should().BeEquivalentTo(expectedRatings);
-        secondResult.Should().BeSameAs(firstResult);
+        firstResultTask.IsSuccess.Should().BeTrue();
+        secondResultTask.IsSuccess.Should().BeTrue();
+        firstResultTask.Value.Should().BeEquivalentTo(expectedRatings);
+        secondResultTask.Value.Should().BeEquivalentTo(expectedRatings);
+        secondResultTask.Value.Should().BeSameAs(firstResultTask.Value);
         await _mockParser
             .Received(1)
             .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
@@ -234,14 +247,12 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(portfolios);
+            .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         _mockParser
             .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
-          .Returns(callInfo =>
-          {
-              return Task.Delay(loansLoadDelay).ContinueWith(_ => (IReadOnlyList<Loan>)loans);
-          });
+            .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Loan>, Error>>(
+                Task.Delay(loansLoadDelay).ContinueWith(_ => Result<IReadOnlyList<Loan>, Error>.Ok((IReadOnlyList<Loan>)loans))));
 
         // Act
         var loansTask = _store.GetOrCacheAsync<Loan>(CancellationToken.None).AsTask();
@@ -249,13 +260,15 @@ public class MarketDataStoreTests : IDisposable
         var portfoliosTask = _store.GetOrCacheAsync<Portfolio>(CancellationToken.None).AsTask();
 
         // Assert - portfolios should complete before loans
-        var portfolioResult = await portfoliosTask;
-        portfolioResult.Should().BeEquivalentTo(portfolios);
+        var portfolioResultTask = await portfoliosTask;
+        portfolioResultTask.IsSuccess.Should().BeTrue();
+        portfolioResultTask.Value.Should().BeEquivalentTo(portfolios);
 
         loansTask.IsCompleted.Should().BeFalse("Loans should still be loading");
 
-        var loansResult = await loansTask;
-        loansResult.Should().BeEquivalentTo(loans);
+        var loansResultTask = await loansTask;
+        loansResultTask.IsSuccess.Should().BeTrue();
+        loansResultTask.Value.Should().BeEquivalentTo(loans);
     }
 
     [Fact]
@@ -284,7 +297,7 @@ public class MarketDataStoreTests : IDisposable
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(callInfo => throw new InvalidOperationException("First call fails"),
-                     callInfo => portfolios);
+                     callInfo => Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         // Act
         var firstCall = async () => await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
@@ -293,7 +306,8 @@ public class MarketDataStoreTests : IDisposable
         var secondResult = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
 
         // Assert
-        secondResult.Should().BeEquivalentTo(portfolios);
+        secondResult.IsSuccess.Should().BeTrue();
+        secondResult.Value.Should().BeEquivalentTo(portfolios);
         await _mockParser
                    .Received(2)
                    .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
@@ -309,7 +323,7 @@ public class MarketDataStoreTests : IDisposable
         var portfolios = new List<Portfolio> { new("P1", "Portfolio 1", "US", "USD") }.AsReadOnly();
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(portfolios);
+            .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         // Act
         var act = async () => await _store.GetOrCacheAsync<Portfolio>(cts.Token);
@@ -327,7 +341,9 @@ public class MarketDataStoreTests : IDisposable
 
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(callInfo => Task.Delay(100, cts.Token).ContinueWith(_ => (IReadOnlyList<Portfolio>)portfolios, cts.Token));
+            .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Portfolio>, Error>>(
+                Task.Delay(100, cts.Token).ContinueWith(_ => 
+                    Result<IReadOnlyList<Portfolio>, Error>.Ok((IReadOnlyList<Portfolio>)portfolios), cts.Token)));
 
         // Act
         var loadTask = _store.GetOrCacheAsync<Portfolio>(cts.Token).AsTask();
@@ -341,13 +357,14 @@ public class MarketDataStoreTests : IDisposable
         _mockParser.ClearReceivedCalls();
         _mockParser
             .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
-            .Returns(portfolios);
+            .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         // Second call should reload
         var secondResult = await _store.GetOrCacheAsync<Portfolio>(CancellationToken.None);
 
         // Assert
-        secondResult.Should().BeEquivalentTo(portfolios);
+        secondResult.IsSuccess.Should().BeTrue();
+        secondResult.Value.Should().BeEquivalentTo(portfolios);
         await _mockParser
                   .Received(1)
                   .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());

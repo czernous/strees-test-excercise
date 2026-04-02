@@ -1,48 +1,118 @@
 # Stress Test Application
 
-A full-stack web application for performing stress test calculations on loan portfolios under various house price change scenarios.
+A full-stack stress testing application for loan portfolios. It started as a take-home exercise and was then revisited as a portfolio project with a stronger production-quality focus: correctness first, then explicit failure handling, safe reference-data ingestion, observability, and measured hot-path performance.
 
-## Overview
+## What It Does
 
-This application allows you to:
-- Define house price change scenarios for different countries
-- Calculate expected losses across loan portfolios
-- View detailed calculation results including portfolio-level breakdowns
-- Track calculation history
+The application lets you:
+- define house price shock scenarios by country
+- calculate portfolio-level stressed collateral and expected loss
+- persist and review historical calculations
+- inspect available market-data countries
 
-**Tech Stack:**
-- **Backend**: ASP.NET Core 10 with minimal APIs (Carter), Entity Framework Core, SQLite
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, DaisyUI
+## Tech Stack
+
+- Backend: ASP.NET Core 10, Carter minimal APIs, Entity Framework Core, SQLite
+- Frontend: React 19, TypeScript, Vite, Tailwind CSS v4, DaisyUI
+- Validation and control flow: custom `Result<T, Error>` and typed HTTP results
+- Verification: xUnit, FluentAssertions, BenchmarkDotNet
+
+## Why The Backend Looks Like This
+
+This codebase is intentionally shaped around production concerns even though the current deployment is small.
+
+### 1. File IO, Parsing, and Cache Admission Are Separate
+
+Reference data currently lives in CSV files, but the backend treats three concerns separately:
+- file loading: get bytes from disk
+- parsing: map bytes into typed records
+- integrity validation: reject malformed records before they enter the cache
+
+That separation is deliberate. In a larger system, file acquisition and parsing would likely live behind different services or queues, and the cache might be distributed rather than in-process. The current boundaries are designed so those responsibilities can evolve without rewriting the calculation pipeline.
+
+### 2. Cached Reference Data Is Treated As Trusted Once Admitted
+
+The application does not want corrupted market data in cache. Each record type implements `IIntegrityContract`, and records are validated during ingestion before being admitted into the market-data store. Once cached, handlers can treat reference data as trusted input rather than re-validating it on every request.
+
+### 3. Request Paths Are Explicit About Failure
+
+Expected failures such as invalid input, duplicate requests, missing data, parser errors, and persistence issues are returned through `Result<T, Error>` and mapped to typed HTTP responses. The goal is to keep handlers thin and predictable:
+- pure/domain composition in `Bind`, `Map`, and `Ensure`
+- side-effect boundaries in `Try` and `TryAsync`
+- logging in `Tap` and `TapError`
+- HTTP translation only at the endpoint boundary
+
+### 4. Hot Paths Are Optimised Where The Cost Is Real
+
+The backend avoids repeated CSV reads by caching parsed market data in memory behind per-type locks. The calculation path uses single-pass aggregation and allocation-light loan math. Some ingestion and parsing code is more deliberate than a simple take-home needs because the portfolio goal here was to show how the design would scale into a more realistic stress or risk processing environment.
+
+## Architecture
+
+The backend uses a pragmatic vertical-slice layout for use cases:
+- `Features/Calculations/Create`
+- `Features/Calculations/GetById`
+- `Features/Calculations/List`
+- `Features/Countries/List`
+
+Cross-cutting technical concerns live outside slices where pure VSA becomes awkward inside a single project:
+- `Core/IO` for file loading and CSV parsing
+- `Core/Storage` for in-memory market data caching
+- `Core/Database` for EF Core persistence
+- `Shared/Primitives` for `Result` and `Error`
+- `Shared/Models` for shared domain/reference models
+
+This is intentionally a hybrid rather than dogmatic VSA. In a larger solution, these boundaries would likely move into separate class libraries or services.
+
+## Data Pipeline
+
+The current calculation pipeline is:
+1. request validation
+2. market-data load from cache, or one-time CSV ingestion on cold start
+3. pre-cache integrity validation of parsed records
+4. country validation against cached portfolio metadata
+5. pure loan and portfolio stress calculation
+6. duplicate detection and persistence
+7. typed success or structured error response
+
+Cold-load behaviour is concurrency-safe. If multiple requests need the same uncached reference data at once, only one load occurs per type and the rest reuse the same cached instance.
+
+## Performance And Verification
+
+The repository contains three layers of evidence:
+- unit and integration tests in `StressTestApp.Tests`
+- concurrency and cache verification tests in `StressTestApp.Server/Verification`
+- hot-path benchmarks in `StressTestApp.Server/Benchmarks`
+
+### Current benchmark highlights
+
+Measured on the local development machine with BenchmarkDotNet `ShortRun`:
+- `LoanCalculator.ComputeBatch` over 100k loans: about `12.24 ms`, zero managed allocation
+- `PortfolioCalculator.Calculate` on the full dataset: about `20.98 ms`, about `4.77 KB` allocated
+- cold loan CSV parse: about `147.70 ms`
+- cold loan cache load: about `150.68 ms`
+- warm cached loan read: about `49.05 ns`
+
+These numbers are not presented as universal truth; they are included to demonstrate actual measurement of the intended hot paths.
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Node.js 20+](https://nodejs.org/) (for frontend)
+- [Node.js 20+](https://nodejs.org/)
 
 ## Getting Started
 
-### 1. Clone the Repository
-
-```bash
-cd c:\development\personal\StressTestApp
-```
-
-### 2. Run the Backend
+### Run the backend
 
 ```bash
 cd StressTestApp.Server
 dotnet run
 ```
 
-The backend server will start on:
+Backend URLs:
 - HTTPS: `https://localhost:7044`
 - HTTP: `http://localhost:5101`
 
-The database will be automatically created at `StressTestApp.Server/Data/Db/stresstest.db` on first run.
-
-### 3. Run the Frontend
-
-Open a new terminal:
+### Run the frontend
 
 ```bash
 cd stresstestapp.client
@@ -50,141 +120,62 @@ npm install
 npm run dev
 ```
 
-Alternatively, you can press 'dubug' in Visual Studio to start both frontend and backend.
-
-The frontend development server will start on `https://localhost:59564`
-
-### 4. Open the Application
-
-Navigate to https://localhost:59564 in your browser.
-
-## Features
-
-### Backend Features
-
-- **RESTful API** with minimal APIs using Carter
-- **Feature-based structure** (vertical slices)
-- **Entity Framework Core** with SQLite
-- **CSV data loading** for loans, portfolios, and ratings
-- **In-memory caching** of market data
-- **Health checks** at `/health`
-- **Duplicate calculation prevention** (HTTP 409 on identical inputs)
-- **OpenAPI/Swagger** in development mode
-
-### Frontend Features
-
-- **React 19** with modern patterns:
-  - `use()` hook for data fetching (no `useEffect`)
-  - Suspense for loading states
-  - Error boundaries for error handling
-- **Component-controller pattern** with separated business logic
-- **Request caching** with automatic retry on error boundary reset
-- **Server health check** before app loads
-- **DaisyUI components** for consistent UI
-- **Responsive design** with Tailwind CSS
+The frontend development server runs on `https://localhost:59564`.
 
 ## API Endpoints
 
 ### Calculations
-
-- `POST /api/calculations` - Create a new calculation
-- `GET /api/calculations` - List all calculations (summary)
-- `GET /api/calculations/{id}` - Get detailed calculation results
+- `POST /api/calculations`
+- `GET /api/calculations`
+- `GET /api/calculations/{id}`
 
 ### Countries
-
-- `GET /api/countries` - List available countries
+- `GET /api/countries`
 
 ### Health
-
-- `GET /health` - Health check endpoint
-
-## Example Calculation
-
-**Request:**
-```json
-POST /api/calculations
-{
-  "housePriceChanges": {
-    "GB": -5.12,
-    "US": -4.34,
-    "FR": -3.87,
-    "DE": -1.23,
-    "SG": -5.5,
-    "GR": -5.68
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "calculationId": "01945c2e-3456-7890-abcd-ef1234567890",
-  "createdAtUtc": "2026-03-07T13:00:00Z",
-  "durationMs": 45,
-  "housePriceChanges": { ... },
-  "portfolioCount": 6,
-  "loanCount": 500,
-  "totalExpectedLoss": 1234567.89
-}
-```
+- `GET /health`
 
 ## Running Tests
+
+Existing backend test suite:
 
 ```bash
 cd StressTestApp.Tests
 dotnet test
 ```
 
-## Development
+Additional verification suite:
 
-### Backend
+```bash
+cd StressTestApp.Server
+dotnet test Verification\StressTestApp.Verification.csproj
+```
 
-- The backend uses **hot reload** - changes to C# files will automatically rebuild
-- Database is created automatically on first run
-- CSV data is loaded from `Data/Csv/` on startup
+## Running Benchmarks
 
-### Frontend
+```bash
+cd StressTestApp.Server
+dotnet run -c Release --project Benchmarks\StressTestApp.Benchmarks.csproj -- --filter *
+```
 
-- Vite provides **hot module replacement** - changes apply instantly
-- API requests are proxied to the backend (configured in `vite.config.ts`)
-- Health check runs before app initialization
+BenchmarkDotNet reports are emitted under `StressTestApp.Server/BenchmarkDotNet.Artifacts/results/`.
 
 ## Troubleshooting
 
-### Database Issues
+### Database reset
 
-If you encounter database issues, delete the database and restart:
-
-```bash
-Remove-Item StressTestApp.Server/Data/Db/stresstest.db*
+```powershell
+Remove-Item Data\Db\stresstest.db*
 ```
 
-The database will be recreated on next run.
+The database will be recreated on the next backend start.
 
-### Port Conflicts
-
-If ports are in use, update:
-- Backend: `StressTestApp.Server/Properties/launchSettings.json`
-- Frontend: `stresstestapp.client/vite.config.ts` (DEV_SERVER_PORT)
-
-### Certificate Issues
-
-If you see HTTPS certificate warnings:
+### HTTPS certificate issues
 
 ```bash
 dotnet dev-certs https --trust
 ```
 
-## Architecture Decisions
+## Project Notes
 
-- **React 19 `use()` hook** instead of `useEffect` for data fetching
-- **Feature-based organization** for better cohesion and maintainability
-- **Component-controller pattern** to separate presentation from business logic
-- **Vertical slice architecture** on the backend (features contain all layers)
-- **In-memory market data cache** for performance (CSV loaded on startup)
-- **No migrations** - using EnsureCreated() for simplicity in this exercise
-
-## License
-
-This is an exercise project for demonstration purposes.
+This is a portfolio exercise project. Some boundaries are intentionally more production-oriented than the current single-node deployment strictly requires because the goal was to demonstrate engineering judgment around trusted data ingestion, failure isolation, concurrency safety, and measurable performance.

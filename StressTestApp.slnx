@@ -4,5 +4,7 @@
     <Deploy />
   </Project>
   <Project Path="StressTestApp.Server/StressTestApp.Server.csproj" />
+  <Project Path="StressTestApp.Server/Verification/StressTestApp.Verification.csproj" />
+  <Project Path="StressTestApp.Server/Benchmarks/StressTestApp.Benchmarks.csproj" />
   <Project Path="StressTestApp.Tests/StressTestApp.Tests.csproj" />
 </Solution>

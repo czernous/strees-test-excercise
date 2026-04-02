@@ -1,11 +1,11 @@
-﻿using StressTestApp.Server.Shared.Contracts;
+﻿using StressTestApp.Server.Shared.Primitives.Result;
+using StressTestApp.Server.Shared.Primitives.Errors;
 
 namespace StressTestApp.Server.Core.Storage.InMemoryStore;
 
 public interface IInMemoryStore
 {
-    ValueTask<IReadOnlyList<T>> GetOrCacheAsync<T>(
+    ValueTask<Result<IReadOnlyList<T>, Error>> GetOrCacheAsync<T>(
         CancellationToken ct)
-        where T : struct, IIntegrityContract;
-
+        where T : struct;
 }
