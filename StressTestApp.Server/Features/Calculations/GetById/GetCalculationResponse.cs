@@ -1,6 +1,6 @@
-using StressTestApp.Server.Features.Calculations.Compute;
+using StressTestApp.Server.Shared.Models;
 
-namespace StressTestApp.Server.Features.Calculations.Get;
+namespace StressTestApp.Server.Features.Calculations.GetById;
 
 public sealed record GetCalculationResponse(
     Guid Id,

@@ -1,19 +1,24 @@
 using FluentAssertions;
-using StressTestApp.Server.Infrastructure.CsvLoader;
-using StressTestApp.Server.Infrastructure.CsvLoader.Maps;
+using Microsoft.Extensions.Logging.Abstractions;
+using StressTestApp.Server.Core.IO.Csv.Parser;
+using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
+using StressTestApp.Server.Core.IO.Csv.Parser.Converters;
+using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Features.Calculations.Compute;
-using StressTestApp.Server.Data.Models;
+using StressTestApp.Server.Shared.Models;
 
 namespace StressTestApp.Tests.Features.Calculations;
 
 public class CalculationIntegrationTests
 {
     private readonly string _testDataPath;
-    private readonly CsvLoader _csvLoader;
+    private readonly ICsvParser _csvParser;
 
     public CalculationIntegrationTests()
     {
-        _csvLoader = new CsvLoader();
+        var fileLoader = new FileLoader();
+        var decimalConverter = new DecimalConverter();
+        _csvParser = new CsvParser(fileLoader, NullLogger<CsvParser>.Instance, decimalConverter);
         _testDataPath = Path.Combine(AppContext.BaseDirectory, "TestData", "Csv");
     }
 
@@ -25,9 +30,17 @@ public class CalculationIntegrationTests
         var loansPath = Path.Combine(_testDataPath, "valid_loans.csv");
         var ratingsPath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
-        var portfolios = await _csvLoader.LoadCsvAsync<Portfolio, PortfolioMap>(portfoliosPath);
-        var loans = await _csvLoader.LoadCsvAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvLoader.LoadCsvAsync<Rating, RatingMap>(ratingsPath);
+        var portfoliosResult = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath);
+        var loansResult = await _csvParser.ParseAsync<Loan, LoanMap>(loansPath);
+        var ratingsResult = await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath);
+
+        portfoliosResult.IsSuccess.Should().BeTrue();
+        loansResult.IsSuccess.Should().BeTrue();
+        ratingsResult.IsSuccess.Should().BeTrue();
+
+        var portfolios = portfoliosResult.Value;
+        var loans = loansResult.Value;
+        var ratings = ratingsResult.Value;
 
         var housePriceChanges = new Dictionary<string, decimal>
         {
@@ -90,9 +103,9 @@ public class CalculationIntegrationTests
         var loansPath = Path.Combine(_testDataPath, "valid_loans.csv");
         var ratingsPath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
-        var portfolios = await _csvLoader.LoadCsvAsync<Portfolio, PortfolioMap>(portfoliosPath);
-        var loans = await _csvLoader.LoadCsvAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvLoader.LoadCsvAsync<Rating, RatingMap>(ratingsPath);
+        var portfolios = (await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath)).Value;
+        var loans = (await _csvParser.ParseAsync<Loan, LoanMap>(loansPath)).Value;
+        var ratings = (await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath)).Value;
 
         var housePriceChanges = new Dictionary<string, decimal>
         {
@@ -130,9 +143,9 @@ public class CalculationIntegrationTests
         var loansPath = Path.Combine(_testDataPath, "valid_loans.csv");
         var ratingsPath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
-        var portfolios = await _csvLoader.LoadCsvAsync<Portfolio, PortfolioMap>(portfoliosPath);
-        var loans = await _csvLoader.LoadCsvAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvLoader.LoadCsvAsync<Rating, RatingMap>(ratingsPath);
+        var portfolios = (await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath)).Value;
+        var loans = (await _csvParser.ParseAsync<Loan, LoanMap>(loansPath)).Value;
+        var ratings = (await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath)).Value;
 
         var housePriceChanges = new Dictionary<string, decimal>
         {
@@ -166,9 +179,9 @@ public class CalculationIntegrationTests
         var loansPath = Path.Combine(_testDataPath, "valid_loans.csv");
         var ratingsPath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
-        var portfolios = await _csvLoader.LoadCsvAsync<Portfolio, PortfolioMap>(portfoliosPath);
-        var loans = await _csvLoader.LoadCsvAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvLoader.LoadCsvAsync<Rating, RatingMap>(ratingsPath);
+        var portfolios = (await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath)).Value;
+        var loans = (await _csvParser.ParseAsync<Loan, LoanMap>(loansPath)).Value;
+        var ratings = (await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath)).Value;
 
         // Get all unique countries from portfolios
         var allCountries = portfolios.Select(p => p.Country).Distinct().ToList();
@@ -199,9 +212,9 @@ public class CalculationIntegrationTests
         var loansPath = Path.Combine(_testDataPath, "valid_loans.csv");
         var ratingsPath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
-        var portfolios = await _csvLoader.LoadCsvAsync<Portfolio, PortfolioMap>(portfoliosPath);
-        var loans = await _csvLoader.LoadCsvAsync<Loan, LoanMap>(loansPath);
-        var ratings = await _csvLoader.LoadCsvAsync<Rating, RatingMap>(ratingsPath);
+        var portfolios = (await _csvParser.ParseAsync<Portfolio, PortfolioMap>(portfoliosPath)).Value;
+        var loans = (await _csvParser.ParseAsync<Loan, LoanMap>(loansPath)).Value;
+        var ratings = (await _csvParser.ParseAsync<Rating, RatingMap>(ratingsPath)).Value;
 
         var allCountries = portfolios.Select(p => p.Country).Distinct().ToList();
         var housePriceChanges = allCountries.ToDictionary(country => country, _ => 0m);

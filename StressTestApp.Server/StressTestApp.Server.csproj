@@ -10,6 +10,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Data\**" />
+    <Content Remove="Data\**" />
+    <EmbeddedResource Remove="Data\**" />
+    <None Remove="Data\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Benchmarks\**" />
+    <Content Remove="Benchmarks\**" />
+    <EmbeddedResource Remove="Benchmarks\**" />
+    <None Remove="Benchmarks\**" />
+    <Compile Remove="Verification\**" />
+    <Content Remove="Verification\**" />
+    <EmbeddedResource Remove="Verification\**" />
+    <None Remove="Verification\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Carter" Version="10.0.0" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
@@ -29,9 +47,5 @@
     </ProjectReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Data\Csv\" />
-    <Folder Include="Data\Repositories\" />
-  </ItemGroup>
-
 </Project>
+
