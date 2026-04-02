@@ -1,0 +1,144 @@
+name: Benchmark Compare
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: "Baseline ref to benchmark"
+        required: true
+        default: "portfolio/original-bench"
+      candidate_ref:
+        description: "Candidate ref to benchmark"
+        required: true
+        default: "master"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Benchmark ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: baseline
+            ref: ${{ inputs.baseline_ref }}
+            artifact: benchmark-baseline
+            title: Baseline Benchmark Summary
+          - label: candidate
+            ref: ${{ inputs.candidate_ref }}
+            artifact: benchmark-candidate
+            title: Candidate Benchmark Summary
+
+    steps:
+      - name: Checkout workflow tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          path: repo
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run benchmarks
+        shell: pwsh
+        working-directory: repo/StressTestApp.Server
+        run: >
+          dotnet run -c Release --project Benchmarks/StressTestApp.Benchmarks.csproj -- --filter *
+
+      - name: Generate markdown summary
+        shell: pwsh
+        run: >
+          ./tooling/StressTestApp.Server/Benchmarks/Ci/Write-BenchmarkMarkdown.ps1
+          -ResultsDir "./repo/StressTestApp.Server/BenchmarkDotNet.Artifacts/results"
+          -OutputPath "./reports/${{ matrix.label }}/summary.md"
+          -Title "${{ matrix.title }} (${{ matrix.ref }})"
+
+      - name: Write run metadata
+        shell: pwsh
+        run: |
+          $sha = git -C ./repo rev-parse HEAD
+          @"
+          label=${{ matrix.label }}
+          ref=${{ matrix.ref }}
+          sha=$sha
+          runner_os=${{ runner.os }}
+          "@ | Set-Content "./reports/${{ matrix.label }}/metadata.txt"
+
+      - name: Stage artifact payload
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "./artifact/${{ matrix.label }}/results" | Out-Null
+          Copy-Item "./repo/StressTestApp.Server/BenchmarkDotNet.Artifacts/results/*" "./artifact/${{ matrix.label }}/results/" -Recurse -Force
+          Copy-Item "./reports/${{ matrix.label }}/summary.md" "./artifact/${{ matrix.label }}/summary.md" -Force
+          Copy-Item "./reports/${{ matrix.label }}/metadata.txt" "./artifact/${{ matrix.label }}/metadata.txt" -Force
+
+      - name: Append summary to job summary
+        shell: pwsh
+        run: Get-Content "./artifact/${{ matrix.label }}/summary.md" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          retention-days: 30
+          path: artifact/${{ matrix.label }}
+
+  compare:
+    name: Generate Comparison Report
+    runs-on: ubuntu-latest
+    needs: benchmark
+
+    steps:
+      - name: Checkout workflow tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+
+      - name: Download baseline artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: artifacts/baseline
+
+      - name: Download candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-candidate
+          path: artifacts/candidate
+
+      - name: Generate comparison markdown
+        shell: pwsh
+        run: >
+          ./tooling/StressTestApp.Server/Benchmarks/Ci/Write-BenchmarkMarkdown.ps1
+          -ResultsDir "./artifacts/candidate/results"
+          -CompareToResultsDir "./artifacts/baseline/results"
+          -OutputPath "./reports/comparison.md"
+          -Title "Benchmark Comparison"
+          -CurrentLabel "Candidate (${{ inputs.candidate_ref }})"
+          -BaselineLabel "Baseline (${{ inputs.baseline_ref }})"
+
+      - name: Append comparison to job summary
+        shell: pwsh
+        run: |
+          Get-Content ./artifacts/baseline/summary.md >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          Get-Content ./artifacts/candidate/summary.md >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          Get-Content ./reports/comparison.md >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload comparison artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-comparison
+          retention-days: 30
+          path: reports/comparison.md
