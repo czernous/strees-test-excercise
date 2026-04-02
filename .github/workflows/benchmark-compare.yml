@@ -55,11 +55,32 @@ jobs:
         run: >
           dotnet run -c Release --project Benchmarks/StressTestApp.Benchmarks.csproj -- --filter *
 
+      - name: Resolve benchmark results directory
+        id: results
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "./repo/StressTestApp.Server/BenchmarkDotNet.Artifacts/results",
+            "./repo/StressTestApp.Server/Benchmarks/BenchmarkDotNet.Artifacts/results"
+          )
+
+          $resultsDir = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+          if (-not $resultsDir) {
+            Write-Host "Expected benchmark result directories were not found."
+            Get-ChildItem ./repo/StressTestApp.Server -Recurse -Directory |
+              Where-Object { $_.Name -eq 'BenchmarkDotNet.Artifacts' } |
+              Select-Object -ExpandProperty FullName
+            throw "Benchmark results directory not found."
+          }
+
+          "results_dir=$resultsDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Generate markdown summary
         shell: pwsh
         run: >
           ./tooling/StressTestApp.Server/Benchmarks/Ci/Write-BenchmarkMarkdown.ps1
-          -ResultsDir "./repo/StressTestApp.Server/BenchmarkDotNet.Artifacts/results"
+          -ResultsDir "${{ steps.results.outputs.results_dir }}"
           -OutputPath "./reports/${{ matrix.label }}/summary.md"
           -Title "${{ matrix.title }} (${{ matrix.ref }})"
 
@@ -78,7 +99,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "./artifact/${{ matrix.label }}/results" | Out-Null
-          Copy-Item "./repo/StressTestApp.Server/BenchmarkDotNet.Artifacts/results/*" "./artifact/${{ matrix.label }}/results/" -Recurse -Force
+          Copy-Item "${{ steps.results.outputs.results_dir }}/*" "./artifact/${{ matrix.label }}/results/" -Recurse -Force
           Copy-Item "./reports/${{ matrix.label }}/summary.md" "./artifact/${{ matrix.label }}/summary.md" -Force
           Copy-Item "./reports/${{ matrix.label }}/metadata.txt" "./artifact/${{ matrix.label }}/metadata.txt" -Force
 
@@ -142,3 +163,4 @@ jobs:
           name: benchmark-comparison
           retention-days: 30
           path: reports/comparison.md
+
