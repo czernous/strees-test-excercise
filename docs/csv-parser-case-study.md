@@ -21,6 +21,18 @@ That was functionally fine, but the portfolio rewrite introduced stronger bounda
 Those changes improved correctness and clarity, but they also created a good question:
 - did the stronger architecture actually make the hot path worse?
 
+## What Was Wrong In The Original Submission
+
+The original submission was not just "slower". It had concrete weaknesses worth revisiting.
+
+- The cold path spent too much time and memory on CSV ingestion.
+- The parsing path did more work than necessary, especially on first-load materialization.
+- Parsing, malformed-row handling, and cache-admission concerns were not separated as clearly as they should have been.
+- Integrity validation was not yet framed strongly enough as a pre-cache boundary.
+- The cache and concurrency story worked, but it was not yet backed by focused verification and benchmark evidence.
+- The runtime cost was concentrated in exactly the wrong place: cold ingestion and cold calculation creation.
+
+That is why this became a useful case study. The final version did not just micro-optimise a decent baseline. It improved correctness boundaries, cache-admission discipline, failure handling, and cold-path runtime behaviour together.
 ## What Was Benchmarked
 
 The benchmarking was split into layers on purpose.
@@ -184,3 +196,4 @@ Against the best tuned `CsvHelper` branch, the handwritten `Sep` path also won c
 3. In hot parsing code, "cleaner" abstractions often lose unless they preserve the exact low-level work shape.
 4. Source generation is useful for boilerplate, but it does not automatically preserve a hand-tuned runtime path.
 5. For this project, the handwritten parser was the right end state because it stayed readable enough while preserving the best numbers.
+
