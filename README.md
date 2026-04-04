@@ -94,13 +94,13 @@ Latest GitHub Actions Linux snapshot as of `2026-04-04`, comparing:
 <!-- benchmark-table:start -->
 | Benchmark | Original | Best CsvHelper | Final Handwritten Sep |
 |---|---:|---:|---:|
-| `LoanCalculator.ComputeBatch` | `14.59 ms`, `0 B` | `12.27 ms`, `0 B` | `14.69 ms`, `0 B` |
-| `PortfolioCalculator.CalculatePortfolioStress` | `22.88 ms`, `11.45 MB` | `21.25 ms`, `4.77 KB` | `25.40 ms`, `4.8 KB` |
-| `CsvParser.ParseLoansAsync` | n/a | `126.302 ms`, `28683.45 KB` | `29.68 ms`, `6259.6 KB` |
-| `MarketDataStore.ColdLoadLoansAsync` | `108,852,928.53 ns`, `27202795 B` | `124,724,383.33 ns`, `29375240 B` | `29,692,610.77 ns`, `6412354 B` |
-| `MarketDataStore.WarmCacheLoansAsync` | `60.95 ns`, `336 B` | `47.16 ns`, `72 B` | `67.32 ns`, `72 B` |
-| `CalculationPipeline.CreateCalculationWarmAsync` | `34.09 ms`, `12.42 MB` | `26.19 ms`, `1000.35 KB` | `27.41 ms`, `975.72 KB` |
-| `CalculationPipeline.CreateCalculationColdAsync` | `192.78 ms`, `38.54 MB` | `178.28 ms`, `31330.8 KB` | `61.24 ms`, `7287.04 KB` |
+| `LoanCalculator.ComputeBatch` | `17.99 ms`, `0 B` | `12.27 ms`, `0 B` | `14.73 ms`, `0 B` |
+| `PortfolioCalculator.CalculatePortfolioStress` | `25.64 ms`, `11.45 MB` | `21.25 ms`, `4.77 KB` | `25.72 ms`, `4.8 KB` |
+| `CsvParser.ParseLoansAsync` | n/a | `126.302 ms`, `28683.45 KB` | `32.45 ms`, `6258.78 KB` |
+| `MarketDataStore.ColdLoadLoansAsync` | `106,902,195.73 ns`, `27204022 B` | `124,724,383.33 ns`, `29375240 B` | `31,645,260.12 ns`, `6411793 B` |
+| `MarketDataStore.WarmCacheLoansAsync` | `52.73 ns`, `336 B` | `47.16 ns`, `72 B` | `71.88 ns`, `72 B` |
+| `CalculationPipeline.CreateCalculationWarmAsync` | `37.21 ms`, `12.42 MB` | `26.19 ms`, `1000.35 KB` | `27.43 ms`, `975.61 KB` |
+| CalculationPipeline.CreateCalculationColdAsync | 194.78 ms, 38.54 MB | 178.28 ms, 31330.8 KB | 62.36 ms, 7289.48 KB |
 <!-- benchmark-table:end -->
 
 The main result is still on the cold path. The final handwritten `Sep` parser is materially faster and materially leaner than both the original submission and the best `CsvHelper` branch, while keeping warm-path allocation flat and request latency competitive.
@@ -219,6 +219,8 @@ dotnet dev-certs https --trust
 ## Project Notes
 
 This is a portfolio exercise project. Some boundaries are intentionally more production-oriented than the current single-node deployment strictly requires because the goal was to demonstrate engineering judgment around trusted data ingestion, failure isolation, concurrency safety, and measurable performance.
+
+
 
 
 
