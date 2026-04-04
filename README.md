@@ -86,22 +86,24 @@ The repository contains three layers of evidence:
 
 ### Current benchmark highlights
 
-Local benchmark snapshot as of `2026-04-04`, comparing:
+Latest GitHub Actions Linux snapshot as of `2026-04-04`, comparing:
 - original submission
 - best tuned `CsvHelper` branch
-- final handwritten `Sep` parser
+- final handwritten `Sep` parser on `master`
 
+<!-- benchmark-table:start -->
 | Benchmark | Original | Best CsvHelper | Final Handwritten Sep |
 |---|---:|---:|---:|
-| `LoanCalculator.ComputeBatch` | `13.93 ms`, `0 B` | `12.27 ms`, `0 B` | `12.51 ms`, `0 B` |
-| `PortfolioCalculator.CalculatePortfolioStress` | `21.08 ms`, `11.45 MB` | `21.25 ms`, `4.77 KB` | `21.19 ms`, `4.8 KB` |
-| `CsvParser.ParseLoansAsync` | n/a | `126.302 ms`, `28683.45 KB` | `33.84 ms`, `6258.71 KB` |
-| `MarketDataStore.ColdLoadLoansAsync` | `144.11 ms`, `27.3 MB` | `124.72 ms`, `29375240 B` | `29.20 ms`, `6412680 B` |
-| `MarketDataStore.WarmCacheLoansAsync` | `46.53 ns`, `336 B` | `47.16 ns`, `72 B` | `49.49 ns`, `72 B` |
-| `CalculationPipeline.CreateCalculationWarmAsync` | n/a | `26.19 ms`, `1000.35 KB` | `24.27 ms`, `979.93 KB` |
-| `CalculationPipeline.CreateCalculationColdAsync` | n/a | `178.28 ms`, `31330.8 KB` | `60.15 ms`, `7312.22 KB` |
+| `LoanCalculator.ComputeBatch` | `14.59 ms`, `0 B` | `12.27 ms`, `0 B` | `14.69 ms`, `0 B` |
+| `PortfolioCalculator.CalculatePortfolioStress` | `22.88 ms`, `11.45 MB` | `21.25 ms`, `4.77 KB` | `25.40 ms`, `4.8 KB` |
+| `CsvParser.ParseLoansAsync` | n/a | `126.302 ms`, `28683.45 KB` | `29.68 ms`, `6259.6 KB` |
+| `MarketDataStore.ColdLoadLoansAsync` | `108,852,928.53 ns`, `27202795 B` | `124,724,383.33 ns`, `29375240 B` | `29,692,610.77 ns`, `6412354 B` |
+| `MarketDataStore.WarmCacheLoansAsync` | `60.95 ns`, `336 B` | `47.16 ns`, `72 B` | `67.32 ns`, `72 B` |
+| `CalculationPipeline.CreateCalculationWarmAsync` | `34.09 ms`, `12.42 MB` | `26.19 ms`, `1000.35 KB` | `27.41 ms`, `975.72 KB` |
+| `CalculationPipeline.CreateCalculationColdAsync` | `192.78 ms`, `38.54 MB` | `178.28 ms`, `31330.8 KB` | `61.24 ms`, `7287.04 KB` |
+<!-- benchmark-table:end -->
 
-The main result is on the cold path. The final handwritten `Sep` parser is materially faster and materially leaner than both the original submission and the best `CsvHelper` branch, while keeping the warm path effectively flat.
+The main result is still on the cold path. The final handwritten `Sep` parser is materially faster and materially leaner than both the original submission and the best `CsvHelper` branch, while keeping warm-path allocation flat and request latency competitive.
 
 ### CSV parser experiment notes
 

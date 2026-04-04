@@ -30,6 +30,7 @@ builder.Services.ConfigureOptions<CsvPathsSetup>();
 builder.Services.AddSingleton<ICsvParser, CsvParser>();
 builder.Services.AddSingleton<IMarketDataStore, MarketDataStore>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.AddCarter();
 builder.Services.AddOpenApi();
