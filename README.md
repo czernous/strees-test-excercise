@@ -82,34 +82,51 @@ The repository contains three layers of evidence:
 - unit and integration tests in `StressTestApp.Tests`
 - concurrency and cache verification tests in `StressTestApp.Server/Verification`
 - hot-path benchmarks in `StressTestApp.Server/Benchmarks`
-- a committed benchmark reference snapshot in `docs/benchmarks/latest-linux-comparison.md`
+- a committed benchmark reference snapshot in [docs/benchmarks/latest-linux-comparison.md](/C:/development/personal/StressTestApp/docs/benchmarks/latest-linux-comparison.md)
 
 ### Current benchmark highlights
 
-Latest stable branch-to-branch comparison comes from the GitHub Actions Linux run (`ubuntu-latest`) against `portfolio/original-bench`:
-- `CalculationPipeline.CreateCalculationColdAsync`: `173.68 ms`, `29952.71 KB` vs original `184.86 ms`, `38.53 MB`
-- `CalculationPipeline.CreateCalculationWarmAsync`: `33.49 ms`, `998.94 KB` vs original `44.06 ms`, `12.42 MB`
-- `MarketDataStore.ColdLoadLoansAsync`: `120,981,863.58 ns`, `29376268 B` vs original `110,028,014.20 ns`, `27204029 B`
-- `MarketDataStore.WarmCacheLoansAsync`: `67.20 ns`, `72 B` vs original `57.41 ns`, `336 B`
-- `PortfolioCalculator.CalculatePortfolioStress`: `28.68 ms`, `4.77 KB` vs original `24.14 ms`, `11.45 MB`
-- `LoanCalculator.ComputeBatch`: `16.29 ms`, `0 B` vs original `16.12 ms`, `0 B`
+Local benchmark snapshot as of `2026-04-04`, comparing:
+- original submission
+- best tuned `CsvHelper` branch
+- final handwritten `Sep` parser
 
-These numbers are not presented as universal truth; they are included to demonstrate actual measurement of the intended hot paths and the tradeoffs between the original and current implementations.
+| Benchmark | Original | Best CsvHelper | Final Handwritten Sep |
+|---|---:|---:|---:|
+| `LoanCalculator.ComputeBatch` | `13.93 ms`, `0 B` | `12.27 ms`, `0 B` | `12.51 ms`, `0 B` |
+| `PortfolioCalculator.CalculatePortfolioStress` | `21.08 ms`, `11.45 MB` | `21.25 ms`, `4.77 KB` | `21.19 ms`, `4.8 KB` |
+| `CsvParser.ParseLoansAsync` | n/a | `126.302 ms`, `28683.45 KB` | `33.84 ms`, `6258.71 KB` |
+| `MarketDataStore.ColdLoadLoansAsync` | `144.11 ms`, `27.3 MB` | `124.72 ms`, `29375240 B` | `29.20 ms`, `6412680 B` |
+| `MarketDataStore.WarmCacheLoansAsync` | `46.53 ns`, `336 B` | `47.16 ns`, `72 B` | `49.49 ns`, `72 B` |
+| `CalculationPipeline.CreateCalculationWarmAsync` | n/a | `26.19 ms`, `1000.35 KB` | `24.27 ms`, `979.93 KB` |
+| `CalculationPipeline.CreateCalculationColdAsync` | n/a | `178.28 ms`, `31330.8 KB` | `60.15 ms`, `7312.22 KB` |
+
+The main result is on the cold path. The final handwritten `Sep` parser is materially faster and materially leaner than both the original submission and the best `CsvHelper` branch, while keeping the warm path effectively flat.
 
 ### CSV parser experiment notes
 
-The original parser used `CsvHelper.GetRecordsAsync<T>()`, but still materialised the full dataset into a list before returning it, so it was not truly streaming end-to-end.
+The parser ended up on a handwritten `Sep` path, not on `CsvHelper` and not on source generation.
 
-Two follow-up spikes were benchmarked against the current buffered parser:
-- true stream-based `CsvHelper.GetRecordsAsync<T>()` over `FileStream`
-- stream-based `CsvHelper.GetRecords<T>()` over `FileStream`
+What held up under measurement:
+- buffered file loading stayed separate from parsing
+- column indexes are bound once per file
+- numeric fields are parsed once, directly from spans
+- string creation stays on `SepToString.PoolPerCol(maximumStringLength: 128)`
+- quote parsing is disabled
+- surrounding spaces are trimmed only when a final string is materialized
 
-Both versions moved the implementation closer to the intended streaming architecture, but both regressed the cold calculation path compared to the buffered parser. The async-row variant regressed the most; the sync-row variant recovered parser-level speed but still lost in the end-to-end cold request benchmark.
+What did not hold up:
+- stream-first `CsvHelper` spikes
+- callback-heavy `CsvHelper` parsing
+- a custom decimal converter
+- FP-style parsing pipelines
+- parser-local memoization/canonicalization
+- source-generated schemas and generated registry for the runtime path
 
-Isolation benchmarks showed that the loader abstraction itself was not the problem: `LoadAsync` is effectively free relative to parsing, and the buffered `MemoryStream` path was actually faster than direct `FileStream -> CsvHelper` parsing on the hot loan file. The dominant cost appeared inside CsvHelper's mapped materialization path, not in the ingestion boundary itself. Two self-inflicted costs were then removed from the production parser: a bad initial-capacity heuristic that forced list growth on the loan dataset, and parser callbacks that touched `Parser.Record` / `RawRecord` on every row. Those callbacks were far more expensive than the validation they were trying to support. The current parser relies on CsvHelper's normal blank-line handling and keeps record validation before cache admission. It no longer pays the per-row callback cost just to detect blank rows; malformed-field behavior now follows CsvHelper's default converter semantics on the production loan map; the project no longer carries a custom decimal converter in the live ingestion path. The benchmark matrix now focuses on separating file load, parse, materialization, validation, and callback overhead before considering any different parser implementation. Naming continues to follow behaviour here: `FileLoader.LoadAsync` is accurate for the buffered implementation, and the parser abstraction remains the stable boundary over whatever concrete parsing strategy is ultimately justified.
+The source-generation experiment was useful as a maintainability spike, but it regressed the tuned handwritten path. The project keeps the handwritten schemas because they are still readable and they preserve the best cold-path numbers.
 
 For the stable reviewer-facing snapshot, see:
-- `docs/benchmarks/latest-linux-comparison.md`
+- [docs/benchmarks/latest-linux-comparison.md](/C:/development/personal/StressTestApp/docs/benchmarks/latest-linux-comparison.md)
 
 For reproducible branch-to-branch reruns in CI, use:
 - `.github/workflows/benchmark-compare.yml`

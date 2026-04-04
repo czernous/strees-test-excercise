@@ -1,10 +1,8 @@
 ﻿namespace StressTestApp.Server.Core.Storage.MarketDataStore;
 
-using CsvHelper.Configuration;
 using Microsoft.Extensions.Options;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
-using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Primitives.Errors;
@@ -68,21 +66,19 @@ public sealed class MarketDataStore(
     {
         return typeof(T) switch
         {
-            Type t when t == typeof(Portfolio) => await ParseAs<T, Portfolio, PortfolioMap>(_filePaths.Portfolios, ct),
-            Type t when t == typeof(Loan) => await ParseAs<T, Loan, LoanMap>(_filePaths.Loans, ct),
-            Type t when t == typeof(Rating) => await ParseAs<T, Rating, RatingMap>(_filePaths.Ratings, ct),
+            Type t when t == typeof(Portfolio) => await ParseAs<T, Portfolio>(_filePaths.Portfolios, ct),
+            Type t when t == typeof(Loan) => await ParseAs<T, Loan>(_filePaths.Loans, ct),
+            Type t when t == typeof(Rating) => await ParseAs<T, Rating>(_filePaths.Ratings, ct),
             _ => Error.Validation("Store.UnsupportedType", $"No mapping for {typeof(T).Name}")
         };
     }
 
     // Helper to bridge the generic T with the specific Parser types safely
-    private async Task<Result<IReadOnlyList<T>, Error>> ParseAs<T, TActual, TMap>(string path, CancellationToken ct)
+    private async Task<Result<IReadOnlyList<T>, Error>> ParseAs<T, TActual>(string path, CancellationToken ct)
         where T : struct
         where TActual : struct, IIntegrityContract
-        where TMap : ClassMap<TActual>      
     {
-        // Now the compiler knows TActual/TMap are safe to pass to the parser
-        var result = await csvParser.ParseAsync<TActual, TMap>(path, ct);
+        var result = await csvParser.ParseAsync<TActual>(path, ct);
 
         return result.IsSuccess
             ? Result.Success((IReadOnlyList<T>)(object)result.Value)

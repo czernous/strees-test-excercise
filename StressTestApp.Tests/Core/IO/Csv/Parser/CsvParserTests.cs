@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Core.IO.Csv.Parser;
-using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
 
 namespace StressTestApp.Tests.Core.IO.Csv.Parser;
@@ -27,7 +26,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_loans.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -42,7 +41,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_loans.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -62,7 +61,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_portfolios.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+        var result = await _csvParser.ParseAsync<Portfolio>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -77,7 +76,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_portfolios.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+        var result = await _csvParser.ParseAsync<Portfolio>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -95,7 +94,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Rating, RatingMap>(filePath);
+        var result = await _csvParser.ParseAsync<Rating>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -110,7 +109,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_ratings.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Rating, RatingMap>(filePath);
+        var result = await _csvParser.ParseAsync<Rating>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -130,7 +129,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "empty_loans.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -145,7 +144,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "invalid_headers.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert - Should return failure Result with validation error
         result.IsSuccess.Should().BeFalse("Headers don't match expected schema");
@@ -159,7 +158,7 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "nonexistent.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert - Should return failure Result with IO error
         result.IsSuccess.Should().BeFalse("File doesn't exist");
@@ -174,15 +173,15 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "loans_with_whitespace.csv");
 
         // Act
-        var result = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
         var loans = result.Value;
         loans.Should().HaveCount(3);
-        loans[0].CreditRating.Should().Be("AAA", "leading and trailing whitespace should be trimmed");
-        loans[1].CreditRating.Should().Be("AA", "trailing whitespace should be trimmed");
-        loans[2].CreditRating.Should().Be("A", "leading whitespace should be trimmed");
+        loans[0].CreditRating.Should().Be("AAA", "leading and trailing whitespace should be normalized");
+        loans[1].CreditRating.Should().Be("AA", "trailing whitespace should be normalized");
+        loans[2].CreditRating.Should().Be("A", "leading whitespace should be normalized");
     }
 
     [Fact]
@@ -192,8 +191,8 @@ public class CsvParserTests
         var filePath = Path.Combine(_testDataPath, "valid_loans.csv");
 
         // Act
-        var result1 = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
-        var result2 = await _csvParser.ParseAsync<Loan, LoanMap>(filePath);
+        var result1 = await _csvParser.ParseAsync<Loan>(filePath);
+        var result2 = await _csvParser.ParseAsync<Loan>(filePath);
 
         // Assert
         result1.IsSuccess.Should().BeTrue();
@@ -218,7 +217,7 @@ public class CsvParserTests
         await File.WriteAllTextAsync(filePath, csvContent);
 
         // Act
-        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+        var result = await _csvParser.ParseAsync<Portfolio>(filePath);
 
         // Assert - Parser skips rows with ANY empty field
         result.IsSuccess.Should().BeTrue();
@@ -245,7 +244,7 @@ public class CsvParserTests
         await File.WriteAllTextAsync(filePath, csvContent);
 
         // Act
-        var result = await _csvParser.ParseAsync<Portfolio, PortfolioMap>(filePath);
+        var result = await _csvParser.ParseAsync<Portfolio>(filePath);
 
         // Assert - Only valid rows loaded, blank rows skipped
         result.IsSuccess.Should().BeTrue();
@@ -257,6 +256,9 @@ public class CsvParserTests
     }
 
 }
+
+
+
 
 
 

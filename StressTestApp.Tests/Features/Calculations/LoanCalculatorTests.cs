@@ -205,14 +205,14 @@ public class LoanCalculatorTests
     }
 
     [Theory]
-    [InlineData(-5.12, 100_000, 100_000, 90_000, 0.05)]
-    [InlineData(-4.34, 150_000, 120_000, 110_000, 0.02)]
-    [InlineData(-3.87, 200_000, 180_000, 170_000, 0.03)]
-    [InlineData(-1.23, 250_000, 200_000, 190_000, 0.01)]
-    [InlineData(-5.5, 80_000, 90_000, 85_000, 0.04)]
-    [InlineData(-5.68, 300_000, 280_000, 275_000, 0.06)]
+    [InlineData(-5.12, 100_000, 90_000, 0.05)]
+    [InlineData(-4.34, 150_000, 110_000, 0.02)]
+    [InlineData(-3.87, 200_000, 170_000, 0.03)]
+    [InlineData(-1.23, 250_000, 190_000, 0.01)]
+    [InlineData(-5.5, 80_000, 85_000, 0.04)]
+    [InlineData(-5.68, 300_000, 275_000, 0.06)]
     public void Compute_ExampleScenarios_ProducesValidResults(
-        decimal pctChange, decimal collateral,  decimal original, decimal outstanding, decimal pd)
+        decimal pctChange, decimal collateral, decimal outstanding, decimal pd)
     {
         // Act
         var result = LoanCalculator.Compute(

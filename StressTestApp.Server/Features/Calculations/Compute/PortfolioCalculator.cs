@@ -19,7 +19,8 @@ public static class PortfolioCalculator
         IReadOnlyDictionary<string, decimal> housePriceChanges)
     {
         // 1. Prepare Lookups access for the main loop)
-        var portfolioMap = portfolios.ToDictionary(p => int.Parse(p.Id));
+        var portfolioMap = portfolios.ToDictionary(
+            p => int.Parse(p.Id, global::System.Globalization.CultureInfo.InvariantCulture));
 
         var pdMap = ratings.ToDictionary(
             r => r.RatingValue,

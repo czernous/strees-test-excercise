@@ -8,6 +8,7 @@
 - Added ingestion-isolation benchmarks to separate file-read, parse, materialization, and validation costs before changing the parser implementation.
 - Added source-generated logging for calculation, country, parser, and global exception paths.
 - Added structured `Error` and `Result` primitives with operation-specific HTTP error mapping.
+- Added centralized package management and shared analyzer defaults at the solution root.
 
 ### Changed
 - Corrected expected-loss calculation to use outstanding amount as the recovery-rate denominator.
@@ -17,8 +18,9 @@
 - Standardised handler flows around `Result` composition, explicit effect boundaries, and typed error responses.
 - Improved market-data caching so first-use loads are concurrency-safe and subsequent requests stay in-memory.
 - Updated the server project to exclude benchmark and verification sources from the web app build.
-- Documented the CSV parser experiments and kept the current implementation on the generic buffered CsvHelper path while the cold-ingestion regression is isolated.
-- Removed expensive parser callbacks and corrected hot-file list sizing after isolation benchmarks showed both were inflating cold-path allocation.
+- Replaced the live CSV ingestion path with a handwritten `Sep` parser that binds column indexes once and parses directly from spans.
+- Tightened `Sep` reader configuration for the known data shape: pooled string creation, quote parsing disabled, and no global trim pass.
+- Kept schema parsing handwritten after benchmarking showed the source-generated runtime path regressed the tuned handwritten implementation.
 
 ### Fixed
 - Fixed partial-read handling in the pooled file loader.
@@ -34,14 +36,15 @@
 
 ### Notes
 - The separate ingestion path is intentional. In production, reference data often arrives from multiple file or feed types, so the goal is to keep one reusable ingestion boundary for source access, parsing, integrity validation, and safe cache admission.
-- The original loader used `GetRecordsAsync<T>()`, but still materialised the full dataset into a list, so it was not truly end-to-end streaming.
-- The current buffered parser is not the same implementation as the original loader. It keeps the stronger ingestion boundary, including explicit file-read buffering, integrity validation before cache admission, and structured parser/load error handling.
-- A true stream-based `CsvHelper.GetRecordsAsync<T>()` spike restored incremental parsing semantics, but materially regressed cold-load and cold-request latency.
-- A hybrid stream-based `CsvHelper.GetRecords<T>()` spike recovered parser-level speed, but still underperformed the buffered implementation in the end-to-end cold calculation pipeline.
-- Isolation benchmarks showed the loader abstraction itself was not the issue: buffered loading was cheap, and the dominant cost sat inside CsvHelper on the hot loan file.
-- The parser now relies on CsvHelper's default blank-line handling instead of expensive per-row callbacks, and the production loan map no longer uses a custom decimal converter.
-- The current investigation is focused on explaining that regression within the existing CsvHelper-based ingestion path before considering different parser implementations.
-- Naming should continue to follow behaviour. The current implementation uses buffered file loading, so `FileLoader.LoadAsync` remains accurate; if ingestion moves to stream-based parsing, the loader and parser names should move with it.
+- The original loader used `GetRecordsAsync<T>()`, but still materialised the full dataset into a list, so it was never truly streaming end to end.
+- `CsvHelper` was benchmarked hard before being replaced. The big costs turned out to be mapped materialization, callback-heavy row handling, and avoidable hot-path overhead rather than the file-loader boundary itself.
+- The winning parser shape is still simple: buffered file load, bind indexes once, parse numeric fields once, materialize strings only when needed, validate before cache admission.
+- Several follow-up ideas were measured and rejected for the runtime path: FP-style parsing, string canonicalization, source-generated schemas/registry, and extra parser abstraction in the hot `ParseBound` methods.
+- Final handwritten `Sep` snapshot on the development machine:
+  - `CsvParser.ParseLoansAsync`: `33.84 ms`, `6258.71 KB`
+  - `MarketDataStore.ColdLoadLoansAsync`: `29.20 ms`, `6412680 B`
+  - `CalculationPipeline.CreateCalculationColdAsync`: `60.15 ms`, `7312.22 KB`
+  - `CalculationPipeline.CreateCalculationWarmAsync`: `24.27 ms`, `979.93 KB`
 
 
 

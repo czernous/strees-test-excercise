@@ -1,4 +1,3 @@
-using CsvHelper.Configuration;
 using StressTestApp.Server.Shared.Contracts;
 using StressTestApp.Server.Shared.Primitives.Errors;
 using StressTestApp.Server.Shared.Primitives.Result;
@@ -18,9 +17,8 @@ public interface ICsvParser
     /// A <see cref="Result{T, E}"/> containing the parsed records or a detailed error
     /// if file loading, CSV structure, or record integrity fails.
     /// </returns>
-    ValueTask<Result<IReadOnlyList<T>, Error>> ParseAsync<T, TMap>(
+    ValueTask<Result<IReadOnlyList<T>, Error>> ParseAsync<T>(
          string filePath,
          CancellationToken ct = default)
-         where T : struct, IIntegrityContract
-         where TMap : ClassMap<T>;
+         where T : struct, IIntegrityContract;
 }

@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
-using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Core.IO.FileLoader;
 using StressTestApp.Server.Features.Calculations.Compute;
 using StressTestApp.Server.Shared.Models;
@@ -19,9 +18,9 @@ public sealed class PortfolioCalculatorConcurrencyTests
     {
         var csvDirectory = RepositoryPaths.FindDataCsvDirectory();
 
-        var portfolios = (await _parser.ParseAsync<Portfolio, PortfolioMap>(Path.Combine(csvDirectory, "portfolios.csv"))).Value;
-        var loans = (await _parser.ParseAsync<Loan, LoanMap>(Path.Combine(csvDirectory, "loans.csv"))).Value;
-        var ratings = (await _parser.ParseAsync<Rating, RatingMap>(Path.Combine(csvDirectory, "ratings.csv"))).Value;
+        var portfolios = (await _parser.ParseAsync<Portfolio>(Path.Combine(csvDirectory, "portfolios.csv"))).Value;
+        var loans = (await _parser.ParseAsync<Loan>(Path.Combine(csvDirectory, "loans.csv"))).Value;
+        var ratings = (await _parser.ParseAsync<Rating>(Path.Combine(csvDirectory, "ratings.csv"))).Value;
 
         var housePriceChanges = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
         {
@@ -47,4 +46,5 @@ public sealed class PortfolioCalculatorConcurrencyTests
         }
     }
 }
+
 

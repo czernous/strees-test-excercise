@@ -4,7 +4,6 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using StressTestApp.Server.Core.IO.Csv.Parser;
 using StressTestApp.Server.Core.IO.Csv.Parser.Configurations;
-using StressTestApp.Server.Core.IO.Csv.Parser.Maps;
 using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Primitives.Result;
 using StressTestApp.Server.Shared.Primitives.Errors;
@@ -54,7 +53,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios));
 
         // Act
@@ -65,7 +64,7 @@ public class MarketDataStoreTests : IDisposable
         resultTask.Value.Should().BeEquivalentTo(expectedPortfolios);
         await _mockParser
             .Received(1)
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios));
 
         // Act
@@ -93,7 +92,7 @@ public class MarketDataStoreTests : IDisposable
         secondResultTask.Value.Should().BeSameAs(firstResultTask.Value, "Second call should return exact same cached instance");
         await _mockParser
                 .Received(1)
-                .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
+                .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public class MarketDataStoreTests : IDisposable
 
         var loadDelay = TimeSpan.FromMilliseconds(100);
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Portfolio>, Error>>(
                 Task.Delay(loadDelay).ContinueWith(_ => Result<IReadOnlyList<Portfolio>, Error>.Ok(expectedPortfolios))));
 
@@ -127,7 +126,7 @@ public class MarketDataStoreTests : IDisposable
         results.Should().OnlyContain(r => ReferenceEquals(r.Value, results[0].Value), "All should reference same cached instance");
         await _mockParser
                  .Received(1)
-                 .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
+                 .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -141,7 +140,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
+            .ParseAsync<Loan>(_csvPaths.Loans, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Loan>, Error>.Ok(expectedLoans));
 
         // Act
@@ -152,7 +151,7 @@ public class MarketDataStoreTests : IDisposable
         resultTask.Value.Should().BeEquivalentTo(expectedLoans);
         await _mockParser
             .Received(1)
-            .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>());
+            .ParseAsync<Loan>(_csvPaths.Loans, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -165,7 +164,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
+            .ParseAsync<Loan>(_csvPaths.Loans, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Loan>, Error>.Ok(expectedLoans));
 
         // Act
@@ -180,7 +179,7 @@ public class MarketDataStoreTests : IDisposable
         secondResultTask.Value.Should().BeSameAs(firstResultTask.Value);
         await _mockParser
             .Received(1)
-            .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>());
+            .ParseAsync<Loan>(_csvPaths.Loans, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -194,7 +193,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
+            .ParseAsync<Rating>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Rating>, Error>.Ok(expectedRatings));
 
         // Act
@@ -205,7 +204,7 @@ public class MarketDataStoreTests : IDisposable
         resultTask.Value.Should().BeEquivalentTo(expectedRatings);
         await _mockParser
             .Received(1)
-            .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
+            .ParseAsync<Rating>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -218,7 +217,7 @@ public class MarketDataStoreTests : IDisposable
         }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
+            .ParseAsync<Rating>(_csvPaths.Ratings, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Rating>, Error>.Ok(expectedRatings));
 
         // Act
@@ -233,7 +232,7 @@ public class MarketDataStoreTests : IDisposable
         secondResultTask.Value.Should().BeSameAs(firstResultTask.Value);
         await _mockParser
             .Received(1)
-            .ParseAsync<Rating, RatingMap>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
+            .ParseAsync<Rating>(_csvPaths.Ratings, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -246,11 +245,11 @@ public class MarketDataStoreTests : IDisposable
         var loansLoadDelay = TimeSpan.FromMilliseconds(200);
 
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         _mockParser
-            .ParseAsync<Loan, LoanMap>(_csvPaths.Loans, Arg.Any<CancellationToken>())
+            .ParseAsync<Loan>(_csvPaths.Loans, Arg.Any<CancellationToken>())
             .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Loan>, Error>>(
                 Task.Delay(loansLoadDelay).ContinueWith(_ => Result<IReadOnlyList<Loan>, Error>.Ok((IReadOnlyList<Loan>)loans))));
 
@@ -277,7 +276,7 @@ public class MarketDataStoreTests : IDisposable
         // Arrange
         var expectedException = new InvalidOperationException("File not found");
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Throws(expectedException);
 
         // Act
@@ -295,7 +294,7 @@ public class MarketDataStoreTests : IDisposable
         var portfolios = new List<Portfolio> { new("P1", "Portfolio 1", "US", "USD") }.AsReadOnly();
 
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(callInfo => throw new InvalidOperationException("First call fails"),
                      callInfo => Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
@@ -310,7 +309,7 @@ public class MarketDataStoreTests : IDisposable
         secondResult.Value.Should().BeEquivalentTo(portfolios);
         await _mockParser
                    .Received(2)
-                   .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
+                   .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -322,7 +321,7 @@ public class MarketDataStoreTests : IDisposable
 
         var portfolios = new List<Portfolio> { new("P1", "Portfolio 1", "US", "USD") }.AsReadOnly();
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         // Act
@@ -340,7 +339,7 @@ public class MarketDataStoreTests : IDisposable
         var cts = new CancellationTokenSource();
 
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(callInfo => new ValueTask<Result<IReadOnlyList<Portfolio>, Error>>(
                 Task.Delay(100, cts.Token).ContinueWith(_ => 
                     Result<IReadOnlyList<Portfolio>, Error>.Ok((IReadOnlyList<Portfolio>)portfolios), cts.Token)));
@@ -356,7 +355,7 @@ public class MarketDataStoreTests : IDisposable
         // Reset mock for second call
         _mockParser.ClearReceivedCalls();
         _mockParser
-            .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
+            .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>())
             .Returns(Result<IReadOnlyList<Portfolio>, Error>.Ok(portfolios));
 
         // Second call should reload
@@ -367,7 +366,7 @@ public class MarketDataStoreTests : IDisposable
         secondResult.Value.Should().BeEquivalentTo(portfolios);
         await _mockParser
                   .Received(1)
-                  .ParseAsync<Portfolio, PortfolioMap>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
+                  .ParseAsync<Portfolio>(_csvPaths.Portfolios, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -384,3 +383,4 @@ public class MarketDataStoreTests : IDisposable
         act.Should().NotThrow();
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using StressTestApp.Server.Shared.Primitives.Errors;
+using StressTestApp.Server.Shared.Primitives.Errors;
 
 namespace StressTestApp.Server.Core.IO.Csv.Parser.Errors;
 
@@ -9,7 +9,7 @@ namespace StressTestApp.Server.Core.IO.Csv.Parser.Errors;
 public static class CsvParserError
 {
     /// <summary>
-    /// The CSV header row does not match the expected domain model schema or ClassMap.
+    /// The CSV header row does not match the expected domain model schema.
     /// Use this when the column count is incorrect or required headers are missing.
     /// </summary>
     /// <param name="expected">A description or name of the expected schema/mapping.</param>
@@ -43,3 +43,4 @@ public static class CsvParserError
     public static Error CorruptStructure(string reason) =>
         Error.Create(ErrorCode.Validation.DataIntegrityViolation, $"CSV structural corruption: {reason}");
 }
+
