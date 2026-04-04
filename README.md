@@ -82,7 +82,7 @@ The repository contains three layers of evidence:
 - unit and integration tests in `StressTestApp.Tests`
 - concurrency and cache verification tests in `StressTestApp.Server/Verification`
 - hot-path benchmarks in `StressTestApp.Server/Benchmarks`
-- a committed benchmark reference snapshot in [docs/benchmarks/latest-linux-comparison.md](/C:/development/personal/StressTestApp/docs/benchmarks/latest-linux-comparison.md)
+- a committed benchmark reference snapshot in [docs/benchmarks/latest-linux-comparison.md](docs/benchmarks/latest-linux-comparison.md)
 
 ### Current benchmark highlights
 
@@ -128,7 +128,8 @@ What did not hold up:
 The source-generation experiment was useful as a maintainability spike, but it regressed the tuned handwritten path. The project keeps the handwritten schemas because they are still readable and they preserve the best cold-path numbers.
 
 For the stable reviewer-facing snapshot, see:
-- [docs/benchmarks/latest-linux-comparison.md](/C:/development/personal/StressTestApp/docs/benchmarks/latest-linux-comparison.md)
+- [docs/benchmarks/latest-linux-comparison.md](docs/benchmarks/latest-linux-comparison.md)
+- [docs/csv-parser-case-study.md](docs/csv-parser-case-study.md)
 
 For reproducible branch-to-branch reruns in CI, use:
 - `.github/workflows/benchmark-compare.yml`
