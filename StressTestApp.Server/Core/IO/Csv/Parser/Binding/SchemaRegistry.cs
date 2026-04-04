@@ -8,7 +8,7 @@ using StressTestApp.Server.Shared.Primitives.Errors;
 using StressTestApp.Server.Shared.Primitives.Result;
 
 /// <summary>
-/// Resolves generated schema binders and parsers for supported CSV contract types.
+/// Resolves handwritten schema binders and bound row parsers for supported CSV contract types.
 /// </summary>
 internal static class SchemaRegistry
 {

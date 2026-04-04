@@ -6,7 +6,6 @@ using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Primitives.Errors;
 using StressTestApp.Server.Shared.Primitives.Result;
 using nietras.SeparatedValues;
-using System.Globalization;
 
 /// <summary>
 /// Handwritten loan schema optimized for the hot ingestion path.
@@ -22,70 +21,30 @@ internal static class LoanSchema
 
     public static Result<ColumnMap, Error> Bind(SepReaderHeader header)
     {
-        if (!header.TryIndexOf(LoanId, out var c0))
-            return CsvParserError.InvalidSchema(LoanId);
+        var sieve = new HeaderSieve(header);
+        var map = new ColumnMap(
+            sieve.Idx(LoanId),
+            sieve.Idx(PortId),
+            sieve.Idx(OriginalAmount),
+            sieve.Idx(OutstandingAmount),
+            sieve.Idx(CollateralValue),
+            sieve.Idx(CreditRating));
 
-        if (!header.TryIndexOf(PortId, out var c1))
-            return CsvParserError.InvalidSchema(PortId);
-
-        if (!header.TryIndexOf(OriginalAmount, out var c2))
-            return CsvParserError.InvalidSchema(OriginalAmount);
-
-        if (!header.TryIndexOf(OutstandingAmount, out var c3))
-            return CsvParserError.InvalidSchema(OutstandingAmount);
-
-        if (!header.TryIndexOf(CollateralValue, out var c4))
-            return CsvParserError.InvalidSchema(CollateralValue);
-
-        if (!header.TryIndexOf(CreditRating, out var c5))
-            return CsvParserError.InvalidSchema(CreditRating);
-
-        return new ColumnMap(c0, c1, c2, c3, c4, c5);
+        return sieve.HasError ? sieve.Error!.Value : map;
     }
 
     public static Result<Loan, Error> ParseBound(Row row, in ColumnMap columns)
     {
-        var loanId = row[columns.C0].Span.Trim(' ');
-        if (loanId.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{LoanId} cannot be empty.");
+        var sieve = new RowSieve(row);
+        var id = sieve.Int(columns.C0, LoanId);
+        var parsedPortId = sieve.Int(columns.C1, PortId);
+        var original = sieve.Decimal(columns.C2, OriginalAmount);
+        var outstanding = sieve.Decimal(columns.C3, OutstandingAmount);
+        var collateral = sieve.Decimal(columns.C4, CollateralValue);
+        var rating = sieve.String(columns.C5, CreditRating);
 
-        if (!int.TryParse(loanId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
-            return Error.Validation("CSV.TypeMismatch", $"{LoanId} must be an integer.");
-
-        var portId = row[columns.C1].Span.Trim(' ');
-        if (portId.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{PortId} cannot be empty.");
-
-        if (!int.TryParse(portId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPortId))
-            return Error.Validation("CSV.TypeMismatch", $"{PortId} must be an integer.");
-
-        var originalAmount = row[columns.C2].Span.Trim(' ');
-        if (originalAmount.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{OriginalAmount} cannot be empty.");
-
-        if (!decimal.TryParse(originalAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var original))
-            return Error.Validation("CSV.TypeMismatch", $"{OriginalAmount} must be a decimal.");
-
-        var outstandingAmount = row[columns.C3].Span.Trim(' ');
-        if (outstandingAmount.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{OutstandingAmount} cannot be empty.");
-
-        if (!decimal.TryParse(outstandingAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var outstanding))
-            return Error.Validation("CSV.TypeMismatch", $"{OutstandingAmount} must be a decimal.");
-
-        var collateralValue = row[columns.C4].Span.Trim(' ');
-        if (collateralValue.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{CollateralValue} cannot be empty.");
-
-        if (!decimal.TryParse(collateralValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var collateral))
-            return Error.Validation("CSV.TypeMismatch", $"{CollateralValue} must be a decimal.");
-
-        var rating = row[columns.C5].ToString();
-        if (string.IsNullOrWhiteSpace(rating))
-            return Error.Validation("CSV.MissingValue", $"{CreditRating} cannot be empty.");
-
-        if (rating.Length > 0 && (rating[0] == ' ' || rating[^1] == ' '))
-            rating = rating.Trim();
+        if (sieve.HasError)
+            return sieve.Error!.Value;
 
         return new Loan(id, parsedPortId, original, outstanding, collateral, rating);
     }

@@ -6,7 +6,6 @@ using StressTestApp.Server.Shared.Models;
 using StressTestApp.Server.Shared.Primitives.Errors;
 using StressTestApp.Server.Shared.Primitives.Result;
 using nietras.SeparatedValues;
-using System.Globalization;
 
 internal static class RatingSchema
 {
@@ -15,30 +14,22 @@ internal static class RatingSchema
 
     public static Result<ColumnMap, Error> Bind(SepReaderHeader header)
     {
-        if (!header.TryIndexOf(RatingValue, out var c0))
-            return CsvParserError.InvalidSchema(RatingValue);
+        var sieve = new HeaderSieve(header);
+        var map = new ColumnMap(
+            sieve.Idx(RatingValue),
+            sieve.Idx(ProbabilityOfDefault));
 
-        if (!header.TryIndexOf(ProbabilityOfDefault, out var c1))
-            return CsvParserError.InvalidSchema(ProbabilityOfDefault);
-
-        return new ColumnMap(c0, c1);
+        return sieve.HasError ? sieve.Error!.Value : map;
     }
 
     public static Result<Rating, Error> ParseBound(Row row, in ColumnMap columns)
     {
-        var ratingValue = row[columns.C0].ToString();
-        if (string.IsNullOrWhiteSpace(ratingValue))
-            return Error.Validation("CSV.MissingValue", $"{RatingValue} cannot be empty.");
+        var sieve = new RowSieve(row);
+        var ratingValue = sieve.String(columns.C0, RatingValue);
+        var defaultProbability = sieve.Int(columns.C1, ProbabilityOfDefault);
 
-        if (ratingValue.Length > 0 && (ratingValue[0] == ' ' || ratingValue[^1] == ' '))
-            ratingValue = ratingValue.Trim();
-
-        var probability = row[columns.C1].Span.Trim(' ');
-        if (probability.IsEmpty)
-            return Error.Validation("CSV.MissingValue", $"{ProbabilityOfDefault} cannot be empty.");
-
-        if (!int.TryParse(probability, NumberStyles.Integer, CultureInfo.InvariantCulture, out var defaultProbability))
-            return Error.Validation("CSV.TypeMismatch", $"{ProbabilityOfDefault} must be an integer.");
+        if (sieve.HasError)
+            return sieve.Error!.Value;
 
         return new Rating(ratingValue, defaultProbability);
     }

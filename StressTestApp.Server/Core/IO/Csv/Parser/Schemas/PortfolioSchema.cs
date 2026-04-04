@@ -16,50 +16,26 @@ internal static class PortfolioSchema
 
     public static Result<ColumnMap, Error> Bind(SepReaderHeader header)
     {
-        if (!header.TryIndexOf(PortId, out var c0))
-            return CsvParserError.InvalidSchema(PortId);
+        var sieve = new HeaderSieve(header);
+        var map = new ColumnMap(
+            sieve.Idx(PortId),
+            sieve.Idx(PortName),
+            sieve.Idx(PortCountry),
+            sieve.Idx(PortCcy));
 
-        if (!header.TryIndexOf(PortName, out var c1))
-            return CsvParserError.InvalidSchema(PortName);
-
-        if (!header.TryIndexOf(PortCountry, out var c2))
-            return CsvParserError.InvalidSchema(PortCountry);
-
-        if (!header.TryIndexOf(PortCcy, out var c3))
-            return CsvParserError.InvalidSchema(PortCcy);
-
-        return new ColumnMap(c0, c1, c2, c3);
+        return sieve.HasError ? sieve.Error!.Value : map;
     }
 
     public static Result<Portfolio, Error> ParseBound(Row row, in ColumnMap columns)
     {
-        var id = row[columns.C0].ToString();
-        if (string.IsNullOrWhiteSpace(id))
-            return Error.Validation("CSV.MissingValue", $"{PortId} cannot be empty.");
+        var sieve = new RowSieve(row);
+        var id = sieve.String(columns.C0, PortId);
+        var name = sieve.String(columns.C1, PortName);
+        var country = sieve.String(columns.C2, PortCountry);
+        var ccy = sieve.String(columns.C3, PortCcy);
 
-        if (id.Length > 0 && (id[0] == ' ' || id[^1] == ' '))
-            id = id.Trim();
-
-        var name = row[columns.C1].ToString();
-        if (string.IsNullOrWhiteSpace(name))
-            return Error.Validation("CSV.MissingValue", $"{PortName} cannot be empty.");
-
-        if (name.Length > 0 && (name[0] == ' ' || name[^1] == ' '))
-            name = name.Trim();
-
-        var country = row[columns.C2].ToString();
-        if (string.IsNullOrWhiteSpace(country))
-            return Error.Validation("CSV.MissingValue", $"{PortCountry} cannot be empty.");
-
-        if (country.Length > 0 && (country[0] == ' ' || country[^1] == ' '))
-            country = country.Trim();
-
-        var ccy = row[columns.C3].ToString();
-        if (string.IsNullOrWhiteSpace(ccy))
-            return Error.Validation("CSV.MissingValue", $"{PortCcy} cannot be empty.");
-
-        if (ccy.Length > 0 && (ccy[0] == ' ' || ccy[^1] == ' '))
-            ccy = ccy.Trim();
+        if (sieve.HasError)
+            return sieve.Error!.Value;
 
         return new Portfolio(id, name, country, ccy);
     }

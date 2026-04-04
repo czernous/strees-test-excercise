@@ -90,7 +90,7 @@ public class IngestionIsolationBenchmarks
         return MaterializeLoans(reader, validate: true);
     }
 
-    private int CountRows(SepReader reader)
+    private static int CountRows(SepReader reader)
     {
         if (!reader.MoveNext())
         {
